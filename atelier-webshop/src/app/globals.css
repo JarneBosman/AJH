@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+:root {
+  --color-bg: #fbfaf8;
+  --color-ink: #2b231d;
+  --color-muted: #6f655c;
+  --color-neutral-100: #f2ede7;
+  --color-neutral-200: #e8e1d8;
+  --color-neutral-300: #d7cabc;
+  --color-wood: #b88a5b;
+  --color-wood-dark: #7f5534;
+  --layout-container-max: 80rem;
+  --layout-section-gap: 5rem;
+}
+
+@theme inline {
+  --font-sans: var(--font-manrope);
+  --font-display: var(--font-jakarta);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--color-ink);
+  background:
+    radial-gradient(circle at 15% -10%, #f1e7da 0%, transparent 35%),
+    radial-gradient(circle at 90% 0%, #ede7de 0%, transparent 32%),
+    var(--color-bg);
+  font-family: var(--font-manrope), sans-serif;
+}
+
+body .max-w-7xl {
+  max-width: var(--layout-container-max) !important;
+}
+
+main section + section {
+  margin-top: var(--layout-section-gap) !important;
+}
+
+body[data-layout="compact"] {
+  --layout-section-gap: 4rem;
+}
+
+body[data-layout="balanced"] {
+  --layout-section-gap: 5rem;
+}
+
+body[data-layout="spacious"] {
+  --layout-section-gap: 6.5rem;
+}
+
+body[data-layout-container="narrow"] {
+  --layout-container-max: 68rem;
+}
+
+body[data-layout-container="standard"] {
+  --layout-container-max: 80rem;
+}
+
+body[data-layout-container="wide"] {
+  --layout-container-max: 92rem;
+}
+
+body[data-section-spacing="tight"] {
+  --layout-section-gap: 3.5rem;
+}
+
+body[data-section-spacing="balanced"] {
+  --layout-section-gap: 5rem;
+}
+
+body[data-section-spacing="airy"] {
+  --layout-section-gap: 7.5rem;
+}
+
+body[data-hero-layout="centered"] [data-home-hero] {
+  grid-template-columns: 1fr;
+  text-align: center;
+}
+
+body[data-hero-layout="centered"] [data-home-hero-copy] {
+  margin-inline: auto;
+}
+
+body[data-hero-layout="centered"] [data-home-hero-actions] {
+  justify-content: center;
+}
+
+body[data-hero-layout="image-first"] [data-home-hero-media] {
+  order: -1;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-jakarta), sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.animate-rise {
+  animation: rise 0.7s ease-out both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition-duration: 0ms !important;
+  }
+}
