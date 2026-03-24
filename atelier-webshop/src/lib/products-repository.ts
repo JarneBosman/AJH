@@ -26,8 +26,8 @@ const parseCustomOptions = (input: unknown): CustomizationOption[] => {
     return [];
   }
 
-  return input
-    .map((entry) => {
+  const parsedOptions = input
+    .map((entry): CustomizationOption | null => {
       if (!entry || typeof entry !== "object") {
         return null;
       }
@@ -87,7 +87,9 @@ const parseCustomOptions = (input: unknown): CustomizationOption[] => {
         choices,
       };
     })
-    .filter((option): option is CustomizationOption => Boolean(option));
+    .filter((option): option is CustomizationOption => option !== null);
+
+  return parsedOptions;
 };
 
 const mapRowToProduct = (row: ProductRow): Product => {
