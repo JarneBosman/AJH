@@ -27,7 +27,7 @@ export const CartContent = ({ cmsContent }: CartContentProps) => {
 
   if (items.length === 0) {
     return (
-      <section className="mx-auto w-full max-w-5xl px-6 pb-20 pt-16 text-center md:px-10">
+      <section className="mx-auto w-full max-w-5xl px-4 pb-16 pt-12 text-center sm:px-6 md:px-10 md:pb-20 md:pt-16">
         <p
           data-cms-editable="cart.eyebrow"
           data-cms-edit-types="text,color,location"
@@ -38,7 +38,7 @@ export const CartContent = ({ cmsContent }: CartContentProps) => {
         <h1
           data-cms-editable="cart.title"
           data-cms-edit-types="text,color,location"
-          className="mt-3 text-4xl font-semibold tracking-tight text-[var(--color-ink)]"
+          className="mt-3 text-3xl font-semibold tracking-tight text-[var(--color-ink)] sm:text-4xl"
         >
           {cmsContent?.title || t.cartEmptyTitle}
         </h1>
@@ -49,7 +49,7 @@ export const CartContent = ({ cmsContent }: CartContentProps) => {
         >
           {cmsContent?.description || t.cartEmptyDescription}
         </p>
-        <div className="mt-8 flex justify-center gap-3">
+        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link
             href="/shop"
             data-cms-editable="cart.primaryCta"
@@ -70,9 +70,9 @@ export const CartContent = ({ cmsContent }: CartContentProps) => {
   }
 
   return (
-    <section className="mx-auto grid w-full max-w-7xl gap-8 px-6 pb-20 pt-12 md:grid-cols-[1.15fr_0.85fr] md:px-10">
+    <section className="mx-auto grid w-full max-w-7xl gap-8 px-4 pb-16 pt-10 sm:px-6 md:grid-cols-[1.15fr_0.85fr] md:px-10 md:pb-20 md:pt-12">
       <div>
-        <div className="mb-6 flex items-end justify-between">
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
           <div>
             <p
               data-cms-editable="cart.eyebrow"
@@ -84,7 +84,7 @@ export const CartContent = ({ cmsContent }: CartContentProps) => {
             <h1
               data-cms-editable="cart.title"
               data-cms-edit-types="text,color,location"
-              className="mt-2 text-4xl font-semibold tracking-tight text-[var(--color-ink)]"
+              className="mt-2 text-3xl font-semibold tracking-tight text-[var(--color-ink)] sm:text-4xl"
             >
               {cmsContent?.title || t.cartReviewTitle}
             </h1>
@@ -127,16 +127,16 @@ export const CartContent = ({ cmsContent }: CartContentProps) => {
 
                 <ul className="grid gap-1 text-sm text-[var(--color-muted)] sm:grid-cols-2">
                   {item.selections.map((selection) => (
-                    <li key={`${item.id}-${selection.optionId}`} className="flex justify-between gap-2">
-                      <span>{selection.optionLabel}</span>
+                    <li key={`${item.id}-${selection.optionId}`} className="grid grid-cols-[1fr_auto] gap-2">
+                      <span className="break-words">{selection.optionLabel}</span>
                       <span className="font-medium text-[var(--color-ink)]">
                         {selection.choiceLabel}
                       </span>
                     </li>
                   ))}
                   {item.dimensions ? (
-                    <li className="flex justify-between gap-2">
-                      <span>{t.cartDimensions}</span>
+                    <li className="grid grid-cols-[1fr_auto] gap-2">
+                      <span className="break-words">{t.cartDimensions}</span>
                       <span className="font-medium text-[var(--color-ink)]">
                         {item.dimensions.width} x {item.dimensions.depth} x {item.dimensions.height} cm
                       </span>

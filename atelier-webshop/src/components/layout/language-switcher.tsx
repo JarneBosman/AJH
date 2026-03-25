@@ -10,7 +10,7 @@ export const LanguageSwitcher = () => {
       <button
         type="button"
         onClick={() => setLanguage("en")}
-        className={`rounded-full px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] transition ${
+        className={`rounded-full px-2.5 py-2 text-[10px] font-semibold uppercase tracking-[0.1em] transition sm:px-3 sm:tracking-[0.16em] ${
           language === "en"
             ? "bg-[var(--color-wood)] text-white"
             : "text-[var(--color-muted)] hover:bg-[var(--color-neutral-100)]"
@@ -22,7 +22,7 @@ export const LanguageSwitcher = () => {
       <button
         type="button"
         onClick={() => setLanguage("nl")}
-        className={`rounded-full px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] transition ${
+        className={`rounded-full px-2.5 py-2 text-[10px] font-semibold uppercase tracking-[0.1em] transition sm:px-3 sm:tracking-[0.16em] ${
           language === "nl"
             ? "bg-[var(--color-wood)] text-white"
             : "text-[var(--color-muted)] hover:bg-[var(--color-neutral-100)]"

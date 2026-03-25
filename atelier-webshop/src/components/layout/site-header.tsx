@@ -28,17 +28,17 @@ export const SiteHeader = ({
 
   return (
     <header className="sticky top-0 z-40 border-b border-black/5 bg-white/90 backdrop-blur-xl">
-      <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4 md:px-10">
+      <div className="mx-auto flex w-full max-w-7xl flex-col items-start gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 md:px-10">
         <Link href="/" className="group inline-flex items-center gap-3">
           <span className="inline-block h-2 w-2 rounded-full bg-[var(--color-wood)] transition group-hover:scale-125" />
-          <span data-preview-brand className="text-sm font-semibold tracking-[0.22em] text-[var(--color-ink)] uppercase">
+          <span data-preview-brand className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-ink)] sm:text-sm sm:tracking-[0.22em]">
             {brandName}
           </span>
         </Link>
 
         <nav
           aria-label="Primary"
-          className="flex items-center gap-1 rounded-full bg-[var(--color-neutral-100)] p-1"
+          className="flex w-full items-center gap-1 overflow-x-auto rounded-full bg-[var(--color-neutral-100)] p-1 sm:w-auto"
         >
           {links.map((link, index) => (
             link.external ? (
@@ -49,7 +49,7 @@ export const SiteHeader = ({
                 rel="noreferrer"
                 data-cms-editable={`nav.header.${index}.label`}
                 data-cms-edit-types="text,color,location"
-                className="rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-muted)] transition hover:bg-white hover:text-[var(--color-ink)] md:px-4"
+                className="whitespace-nowrap rounded-full px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)] transition hover:bg-white hover:text-[var(--color-ink)] sm:text-xs sm:tracking-[0.16em] md:px-4"
               >
                 {link.label}
               </a>
@@ -59,7 +59,7 @@ export const SiteHeader = ({
                 href={link.href}
                 data-cms-editable={`nav.header.${index}.label`}
                 data-cms-edit-types="text,color,location"
-                className="rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-muted)] transition hover:bg-white hover:text-[var(--color-ink)] md:px-4"
+                className="whitespace-nowrap rounded-full px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)] transition hover:bg-white hover:text-[var(--color-ink)] sm:text-xs sm:tracking-[0.16em] md:px-4"
               >
                 {link.label}
               </Link>

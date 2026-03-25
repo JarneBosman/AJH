@@ -48,7 +48,7 @@ export default async function Home() {
         data-home-hero
         data-cms-editable="home.heroSection"
         data-cms-edit-types="shape,location,background"
-        className="mx-auto grid w-full max-w-7xl gap-8 px-6 pb-8 pt-14 md:grid-cols-[1fr_1.1fr] md:px-10 md:pt-20"
+        className="mx-auto grid w-full max-w-7xl gap-6 px-4 pb-6 pt-10 sm:gap-8 sm:px-6 md:grid-cols-[1fr_1.1fr] md:px-10 md:pt-20"
       >
         <div data-home-hero-copy className="animate-rise max-w-xl space-y-6">
           <p
@@ -61,14 +61,14 @@ export default async function Home() {
           <h1
             data-cms-editable="home.heroTitle"
             data-cms-edit-types="text,color,location"
-            className="text-balance text-5xl font-semibold leading-tight tracking-tight text-[var(--color-ink)] md:text-6xl"
+            className="text-balance text-4xl font-semibold leading-tight tracking-tight text-[var(--color-ink)] sm:text-5xl md:text-6xl"
           >
             {cmsHome?.heroTitle || t.homeHeroTitle}
           </h1>
           <p
             data-cms-editable="home.heroDescription"
             data-cms-edit-types="text,color,location"
-            className="text-pretty text-base leading-8 text-[var(--color-muted)] md:text-lg"
+            className="text-pretty text-base leading-7 text-[var(--color-muted)] md:text-lg"
           >
             {cmsHome?.heroDescription || t.homeHeroDescription}
           </p>
@@ -113,7 +113,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="mx-auto mt-12 w-full max-w-7xl px-6 md:px-10">
+      <section className="mx-auto mt-10 w-full max-w-7xl px-4 sm:px-6 md:mt-12 md:px-10">
         <SectionHeading
           eyebrow={cmsHome?.featuredEyebrow || t.homeFeaturedEyebrow}
           title={cmsHome?.featuredTitle || t.homeFeaturedTitle}
@@ -130,7 +130,7 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="mx-auto mt-20 w-full max-w-7xl px-6 md:px-10">
+      <section className="mx-auto mt-14 w-full max-w-7xl px-4 sm:px-6 md:mt-20 md:px-10">
         <SectionHeading
           eyebrow={cmsHome?.categoriesEyebrow || t.homeCategoriesEyebrow}
           title={cmsHome?.categoriesTitle || t.homeCategoriesTitle}
@@ -169,11 +169,11 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="mx-auto mt-20 w-full max-w-7xl px-6 md:px-10">
+      <section className="mx-auto mt-14 w-full max-w-7xl px-4 sm:px-6 md:mt-20 md:px-10">
         <div
           data-cms-editable="home.storyCard"
           data-cms-edit-types="shape,location,background"
-          className="rounded-[2rem] border border-black/5 bg-white p-8 md:p-12"
+          className="rounded-[2rem] border border-black/5 bg-white p-5 sm:p-8 md:p-12"
         >
           <SectionHeading
             eyebrow={cmsHome?.storyEyebrow || t.homeStoryEyebrow}

@@ -111,12 +111,12 @@ export const CustomFurnitureConfigurator = () => {
   };
 
   return (
-    <section className="mx-auto w-full max-w-7xl px-6 pb-20 pt-12 md:px-10">
+    <section className="mx-auto w-full max-w-7xl px-4 pb-16 pt-10 sm:px-6 md:px-10 md:pb-20 md:pt-12">
       <header className="max-w-3xl">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-wood)]">
           {t.configEyebrow}
         </p>
-        <h1 className="mt-3 text-balance text-4xl font-semibold tracking-tight text-[var(--color-ink)] md:text-5xl">
+        <h1 className="mt-3 text-balance text-3xl font-semibold tracking-tight text-[var(--color-ink)] sm:text-4xl md:text-5xl">
           {t.configTitle}
         </h1>
         <p className="mt-4 text-pretty text-base leading-7 text-[var(--color-muted)]">
@@ -124,13 +124,13 @@ export const CustomFurnitureConfigurator = () => {
         </p>
       </header>
 
-      <div className="mt-10 grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
-        <aside className="space-y-4 rounded-3xl border border-black/5 bg-white p-6">
+      <div className="mt-8 grid gap-8 lg:mt-10 lg:grid-cols-[0.95fr_1.05fr]">
+        <aside className="space-y-4 rounded-3xl border border-black/5 bg-white p-5 sm:p-6">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {steps.map((step, index) => (
               <div
                 key={step}
-                className={`rounded-2xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] ${
+                className={`rounded-2xl px-2 py-2 text-[10px] font-semibold uppercase tracking-[0.06em] leading-tight sm:px-3 sm:text-xs sm:tracking-[0.12em] ${
                   index <= stepIndex
                     ? "bg-[var(--color-wood-dark)] text-white"
                     : "bg-[var(--color-neutral-100)] text-[var(--color-muted)]"
@@ -185,7 +185,7 @@ export const CustomFurnitureConfigurator = () => {
           </div>
         </aside>
 
-        <div className="space-y-6 rounded-3xl border border-black/5 bg-white p-6">
+        <div className="space-y-6 rounded-3xl border border-black/5 bg-white p-5 sm:p-6">
           {stepIndex === 0 ? (
             <section className="space-y-3">
               <h2 className="text-xl font-semibold text-[var(--color-ink)]">
@@ -334,7 +334,7 @@ export const CustomFurnitureConfigurator = () => {
                 />
               </div>
 
-              <Button onClick={addConfiguredItem}>{t.configAddCustomToCart}</Button>
+              <Button onClick={addConfiguredItem} className="w-full sm:w-auto">{t.configAddCustomToCart}</Button>
               {statusMessage ? (
                 <p className="text-sm font-medium text-[var(--color-wood-dark)]" role="status">
                   {statusMessage}
@@ -343,7 +343,7 @@ export const CustomFurnitureConfigurator = () => {
             </section>
           ) : null}
 
-          <div className="flex items-center justify-between border-t border-black/5 pt-4">
+          <div className="flex flex-col-reverse gap-2 border-t border-black/5 pt-4 sm:flex-row sm:items-center sm:justify-between">
             <Button variant="ghost" onClick={previousStep} disabled={stepIndex === 0}>
               {t.configPrevious}
             </Button>

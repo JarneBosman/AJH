@@ -39,7 +39,7 @@ export default async function ShopPage() {
   );
 
   return (
-    <section className="mx-auto w-full max-w-7xl px-6 pb-20 pt-12 md:px-10">
+    <section className="mx-auto w-full max-w-7xl px-4 pb-16 pt-10 sm:px-6 md:px-10 md:pb-20 md:pt-12">
       <SectionHeading
         eyebrow={cmsPage?.eyebrow || t.shopEyebrow}
         title={cmsPage?.title || t.shopTitle}

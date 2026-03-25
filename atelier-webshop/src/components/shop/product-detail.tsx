@@ -72,13 +72,13 @@ export const ProductDetail = ({ product, options }: ProductDetailProps) => {
   };
 
   return (
-    <section className="mx-auto w-full max-w-7xl px-6 pb-20 pt-12 md:px-10">
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+    <section className="mx-auto w-full max-w-7xl px-4 pb-16 pt-10 sm:px-6 md:px-10 md:pb-20 md:pt-12">
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-wood)]">
             {product.category}
           </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--color-ink)] md:text-5xl">
+          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-[var(--color-ink)] sm:text-3xl md:text-5xl">
             {product.name}
           </h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-[var(--color-muted)]">
@@ -93,15 +93,15 @@ export const ProductDetail = ({ product, options }: ProductDetailProps) => {
         </Link>
       </div>
 
-      <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr]">
+      <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:gap-12">
         <ImageGallery images={product.images} alt={product.name} />
 
         <div className="space-y-8">
-          <div className="rounded-3xl border border-black/5 bg-white p-6 shadow-[0_20px_50px_-40px_rgba(0,0,0,0.4)]">
+          <div className="rounded-3xl border border-black/5 bg-white p-5 shadow-[0_20px_50px_-40px_rgba(0,0,0,0.4)] sm:p-6">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-muted)]">
               {t.productDynamicPrice}
             </p>
-            <p className="mt-2 text-4xl font-semibold tracking-tight text-[var(--color-ink)]">
+            <p className="mt-2 text-3xl font-semibold tracking-tight text-[var(--color-ink)] sm:text-4xl">
               {formatCurrency(dynamicPrice)}
             </p>
             <p className="mt-2 text-sm text-[var(--color-muted)]">
@@ -112,7 +112,7 @@ export const ProductDetail = ({ product, options }: ProductDetailProps) => {
             </p>
           </div>
 
-          <div className="space-y-6 rounded-3xl border border-black/5 bg-white p-6">
+          <div className="space-y-6 rounded-3xl border border-black/5 bg-white p-5 sm:p-6">
             {options.map((option) => (
               <OptionSelector
                 key={option.id}
@@ -138,7 +138,7 @@ export const ProductDetail = ({ product, options }: ProductDetailProps) => {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-black/5 bg-[var(--color-neutral-100)] p-6">
+          <div className="rounded-3xl border border-black/5 bg-[var(--color-neutral-100)] p-5 sm:p-6">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-muted)]">
               {t.productLivePreview}
             </p>
@@ -154,8 +154,8 @@ export const ProductDetail = ({ product, options }: ProductDetailProps) => {
               </div>
               <ul className="mt-4 space-y-2 text-sm text-[var(--color-muted)]">
                 {selections.map((selection) => (
-                  <li key={selection.optionId} className="flex justify-between gap-4">
-                    <span>{selection.optionLabel}</span>
+                  <li key={selection.optionId} className="grid grid-cols-[1fr_auto] gap-3">
+                    <span className="break-words">{selection.optionLabel}</span>
                     <span className="font-medium text-[var(--color-ink)]">
                       {selection.choiceLabel}
                     </span>
@@ -165,7 +165,7 @@ export const ProductDetail = ({ product, options }: ProductDetailProps) => {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
             <Button onClick={onAddToCart}>{t.productAddToCart}</Button>
             <Button
               variant="secondary"

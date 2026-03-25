@@ -33,15 +33,10 @@ body {
     radial-gradient(circle at 15% -10%, #f1e7da 0%, transparent 35%),
     radial-gradient(circle at 90% 0%, #ede7de 0%, transparent 32%),
     var(--color-bg);
-  font-family: var(--font-manrope), sans-serif;
-}
-
-body .max-w-7xl {
-  font-family: var(--font-heading);
 }
 
 main section + section {
-  margin-top: var(--layout-section-gap) !important;
+  margin-top: clamp(2.75rem, 8vw, var(--layout-section-gap)) !important;
 }
 
 body[data-layout="compact"] {
@@ -114,7 +109,7 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: var(--font-jakarta), sans-serif;
+  font-family: var(--font-heading);
 }
 
 a {

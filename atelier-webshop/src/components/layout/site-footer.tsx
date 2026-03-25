@@ -21,7 +21,7 @@ export const SiteFooter = ({ links: cmsLinks }: { links?: SiteFooterLink[] }) =>
 
   return (
     <footer className="border-t border-black/5 bg-white">
-      <div className="mx-auto grid w-full max-w-7xl gap-8 px-6 py-12 md:grid-cols-3 md:px-10">
+      <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-3 md:px-10 md:py-12">
         <div className="md:col-span-2">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-wood)]">
             {t.footerEyebrow}
@@ -31,7 +31,7 @@ export const SiteFooter = ({ links: cmsLinks }: { links?: SiteFooterLink[] }) =>
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 text-sm text-[var(--color-muted)]">
+        <div className="flex flex-col gap-3 text-sm text-[var(--color-muted)] max-md:text-center md:items-start">
           {links.map((link, index) =>
             link.external ? (
               <a
