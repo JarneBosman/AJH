@@ -90,7 +90,6 @@ const parseCustomOptions = (input: unknown): CustomizationOption[] => {
     .filter((option): option is CustomizationOption => option !== null);
 
   return parsedOptions;
->>>>>>> 3a4bfbf2bb6ff8cf93c4dd41ebfae3dbc490aa58
 };
 
 const mapRowToProduct = (row: ProductRow): Product => {
