@@ -176,6 +176,15 @@ interface CmsMediaAssetRow {
   created_at: string;
 }
 
+interface CmsDraftSnapshot {
+  homeDraft: CmsHomeDraftState;
+  seoDraft: CmsSeoState;
+  pageDrafts: Record<Exclude<CmsPageSlug, "home">, CmsGenericDraftState>;
+  pageSeoDrafts: Record<Exclude<CmsPageSlug, "home">, CmsSeoState>;
+  headerLinks: CmsLinkRowState[];
+  footerLinks: CmsLinkRowState[];
+}
+
 interface PreviewEditableCapabilities {
   text: boolean;
   color: boolean;
@@ -642,6 +651,25 @@ const sanitizeFileName = (value: string) =>
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9._-]/g, "");
 
+const createCmsDraftSnapshot = (
+  homeDraft: CmsHomeDraftState,
+  seoDraft: CmsSeoState,
+  pageDrafts: Record<Exclude<CmsPageSlug, "home">, CmsGenericDraftState>,
+  pageSeoDrafts: Record<Exclude<CmsPageSlug, "home">, CmsSeoState>,
+  headerLinks: CmsLinkRowState[],
+  footerLinks: CmsLinkRowState[],
+): CmsDraftSnapshot => ({
+  homeDraft,
+  seoDraft,
+  pageDrafts,
+  pageSeoDrafts,
+  headerLinks,
+  footerLinks,
+});
+
+const areCmsDraftSnapshotsEqual = (left: CmsDraftSnapshot | null, right: CmsDraftSnapshot | null) =>
+  JSON.stringify(left) === JSON.stringify(right);
+
 export default function AdminPage() {
   const supabase = useMemo(() => getBrowserSupabaseClient(), []);
   const [session, setSession] = useState<Session | null>(null);
@@ -711,6 +739,8 @@ export default function AdminPage() {
   const [cmsHeaderLinks, setCmsHeaderLinks] = useState<CmsLinkRowState[]>([]);
   const [cmsFooterLinks, setCmsFooterLinks] = useState<CmsLinkRowState[]>([]);
   const [cmsHomePublishedAt, setCmsHomePublishedAt] = useState<string | null>(null);
+  const [cmsDraftSavedSnapshot, setCmsDraftSavedSnapshot] = useState<CmsDraftSnapshot | null>(null);
+  const [cmsDraftDirty, setCmsDraftDirty] = useState(false);
   const [cmsMediaAssets, setCmsMediaAssets] = useState<CmsMediaAssetRow[]>([]);
   const [cmsMediaUploadError, setCmsMediaUploadError] = useState("");
   const [isUploadingCmsMedia, setIsUploadingCmsMedia] = useState(false);
@@ -774,6 +804,22 @@ export default function AdminPage() {
   const [imageUploadError, setImageUploadError] = useState("");
   const [isOwner, setIsOwner] = useState<boolean | null>(null);
   const [ownerCheckError, setOwnerCheckError] = useState("");
+
+  const handleDiscardCmsDraftChanges = useCallback(() => {
+    if (!cmsDraftSavedSnapshot) {
+      return;
+    }
+
+    setCmsHomeDraft(cmsDraftSavedSnapshot.homeDraft);
+    setCmsSeoDraft(cmsDraftSavedSnapshot.seoDraft);
+    setCmsPageDrafts(cmsDraftSavedSnapshot.pageDrafts);
+    setCmsPageSeoDrafts(cmsDraftSavedSnapshot.pageSeoDrafts);
+    setCmsHeaderLinks(cmsDraftSavedSnapshot.headerLinks);
+    setCmsFooterLinks(cmsDraftSavedSnapshot.footerLinks);
+    setCmsDraftDirty(false);
+    setCmsError("");
+    setCmsSuccess("Discarded unsaved changes and restored the last saved draft.");
+  }, [cmsDraftSavedSnapshot]);
   const [slugEdited, setSlugEdited] = useState(false);
   const router = useRouter();
   const cmsEditableBindingMap = useMemo(
@@ -1427,24 +1473,23 @@ export default function AdminPage() {
         }>) ?? [];
 
       const homePage = pageRows.find((row) => row.slug === cmsHomeSlug);
-
-      setCmsHomeDraft(parseCmsHomeDraft(homePage?.draft_content));
-      setCmsSeoDraft(parseCmsSeoDraft(homePage?.draft_seo));
+      const nextHomeDraft = parseCmsHomeDraft(homePage?.draft_content);
+      const nextSeoDraft = parseCmsSeoDraft(homePage?.draft_seo);
       setCmsHomePublishedAt(homePage?.published_at ?? null);
 
-      setCmsPageDrafts({
+      const nextPageDrafts = {
         shop: parseCmsGenericDraft(pageRows.find((row) => row.slug === "shop")?.draft_content),
         configurator: parseCmsGenericDraft(
           pageRows.find((row) => row.slug === "configurator")?.draft_content,
         ),
         cart: parseCmsGenericDraft(pageRows.find((row) => row.slug === "cart")?.draft_content),
-      });
+      };
 
-      setCmsPageSeoDrafts({
+      const nextPageSeoDrafts = {
         shop: parseCmsSeoDraft(pageRows.find((row) => row.slug === "shop")?.draft_seo),
         configurator: parseCmsSeoDraft(pageRows.find((row) => row.slug === "configurator")?.draft_seo),
         cart: parseCmsSeoDraft(pageRows.find((row) => row.slug === "cart")?.draft_seo),
-      });
+      };
 
       setCmsPagePublishedAt({
         shop: pageRows.find((row) => row.slug === "shop")?.published_at ?? null,
@@ -1456,8 +1501,27 @@ export default function AdminPage() {
       const header = rows.find((row) => row.location === "header");
       const footer = rows.find((row) => row.location === "footer");
 
-      setCmsHeaderLinks(parseCmsLinkRows(header?.draft_items));
-      setCmsFooterLinks(parseCmsLinkRows(footer?.draft_items));
+      const nextHeaderLinks = parseCmsLinkRows(header?.draft_items);
+      const nextFooterLinks = parseCmsLinkRows(footer?.draft_items);
+
+      setCmsHomeDraft(nextHomeDraft);
+      setCmsSeoDraft(nextSeoDraft);
+      setCmsPageDrafts(nextPageDrafts);
+      setCmsPageSeoDrafts(nextPageSeoDrafts);
+      setCmsHeaderLinks(nextHeaderLinks);
+      setCmsFooterLinks(nextFooterLinks);
+      setCmsDraftSavedSnapshot(
+        createCmsDraftSnapshot(
+          nextHomeDraft,
+          nextSeoDraft,
+          nextPageDrafts,
+          nextPageSeoDrafts,
+          nextHeaderLinks,
+          nextFooterLinks,
+        ),
+      );
+      setCmsDraftDirty(false);
+
       setCmsMediaAssets((mediaData ?? []) as CmsMediaAssetRow[]);
     } catch {
       setCmsError("Failed to load CMS workspace.");
@@ -1530,6 +1594,17 @@ export default function AdminPage() {
         return;
       }
 
+      setCmsDraftSavedSnapshot(
+        createCmsDraftSnapshot(
+          cmsHomeDraft,
+          cmsSeoDraft,
+          cmsPageDrafts,
+          cmsPageSeoDrafts,
+          cmsHeaderLinks,
+          cmsFooterLinks,
+        ),
+      );
+      setCmsDraftDirty(false);
       setCmsSuccess("CMS draft saved.");
     } catch {
       setCmsError("Failed to save CMS draft.");
@@ -1633,6 +1708,17 @@ export default function AdminPage() {
         configurator: publishedAt,
         cart: publishedAt,
       });
+      setCmsDraftSavedSnapshot(
+        createCmsDraftSnapshot(
+          cmsHomeDraft,
+          cmsSeoDraft,
+          cmsPageDrafts,
+          cmsPageSeoDrafts,
+          cmsHeaderLinks,
+          cmsFooterLinks,
+        ),
+      );
+      setCmsDraftDirty(false);
       setCmsSuccess("CMS content published.");
     } catch {
       setCmsError("Failed to publish CMS content.");
@@ -1828,6 +1914,31 @@ export default function AdminPage() {
       void fetchCmsWorkspace();
     }
   }, [session, fetchAppearanceSettings, fetchCategories, fetchCmsWorkspace, fetchProducts]);
+
+  useEffect(() => {
+    if (!cmsDraftSavedSnapshot) {
+      return;
+    }
+
+    const currentSnapshot = createCmsDraftSnapshot(
+      cmsHomeDraft,
+      cmsSeoDraft,
+      cmsPageDrafts,
+      cmsPageSeoDrafts,
+      cmsHeaderLinks,
+      cmsFooterLinks,
+    );
+
+    setCmsDraftDirty(!areCmsDraftSnapshotsEqual(currentSnapshot, cmsDraftSavedSnapshot));
+  }, [
+    cmsDraftSavedSnapshot,
+    cmsFooterLinks,
+    cmsHeaderLinks,
+    cmsHomeDraft,
+    cmsPageDrafts,
+    cmsPageSeoDrafts,
+    cmsSeoDraft,
+  ]);
 
   const handleSaveAppearance = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2093,6 +2204,14 @@ export default function AdminPage() {
         return;
       }
 
+      if (key === "s") {
+        if (activeAdminTab === "appearance") {
+          event.preventDefault();
+          void handleSaveCmsDraft();
+        }
+        return;
+      }
+
       const isUndo = key === "z" && !event.shiftKey;
       const isRedo = (key === "z" && event.shiftKey) || key === "y";
 
@@ -2132,6 +2251,7 @@ export default function AdminPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
     activeAdminTab,
+    handleSaveCmsDraft,
     handleRedoAppearanceChange,
     handleRedoPreviewChange,
     handleUndoAppearanceChange,
@@ -3254,6 +3374,15 @@ export default function AdminPage() {
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${
+                      cmsDraftDirty
+                        ? "bg-amber-100 text-amber-900"
+                        : "bg-emerald-100 text-emerald-700"
+                    }`}
+                  >
+                    {cmsDraftDirty ? "Unsaved changes" : "All changes saved"}
+                  </span>
                   <Button
                     type="button"
                     variant="secondary"
@@ -3305,8 +3434,39 @@ export default function AdminPage() {
                   >
                     {visualEditorEnabled ? "Disable Overlay" : "Enable Overlay"}
                   </Button>
+                  <Button
+                    type="button"
+                    onClick={() => void handleSaveCmsDraft()}
+                    disabled={loadingCms || savingCmsDraft || publishingCms}
+                  >
+                    {savingCmsDraft ? "Saving Draft..." : "Save Draft"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleDiscardCmsDraftChanges}
+                    disabled={!cmsDraftDirty || loadingCms || savingCmsDraft || publishingCms}
+                  >
+                    Discard Changes
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => void handlePublishCms()}
+                    disabled={loadingCms || savingCmsDraft || publishingCms}
+                  >
+                    {publishingCms ? "Publishing..." : "Publish"}
+                  </Button>
                 </div>
               </div>
+
+              {cmsError ? (
+                <p className="mt-3 rounded-lg bg-red-100 px-4 py-2 text-sm text-red-700">{cmsError}</p>
+              ) : null}
+
+              {cmsSuccess ? (
+                <p className="mt-3 rounded-lg bg-emerald-100 px-4 py-2 text-sm text-emerald-700">{cmsSuccess}</p>
+              ) : null}
 
               <div className="mt-4 rounded-xl border border-black/10 bg-[var(--color-neutral-100)]/45 p-4">
                 <p className="text-xs uppercase tracking-[0.16em] text-[var(--color-muted)]">
@@ -3816,6 +3976,15 @@ export default function AdminPage() {
                     Fullscreen Editor
                   </p>
                   <div className="flex items-center gap-2">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${
+                        cmsDraftDirty
+                          ? "bg-amber-100 text-amber-900"
+                          : "bg-emerald-100 text-emerald-700"
+                      }`}
+                    >
+                      {cmsDraftDirty ? "Unsaved" : "Saved"}
+                    </span>
                     <Button
                       type="button"
                       variant="secondary"
@@ -3866,6 +4035,29 @@ export default function AdminPage() {
                       onClick={() => setVisualEditorEnabled((previous) => !previous)}
                     >
                       {visualEditorEnabled ? "Selection On" : "Enable Selection"}
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => void handleSaveCmsDraft()}
+                      disabled={loadingCms || savingCmsDraft || publishingCms}
+                    >
+                      {savingCmsDraft ? "Saving..." : "Save Draft"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={handleDiscardCmsDraftChanges}
+                      disabled={!cmsDraftDirty || loadingCms || savingCmsDraft || publishingCms}
+                    >
+                      Discard
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => void handlePublishCms()}
+                      disabled={loadingCms || savingCmsDraft || publishingCms}
+                    >
+                      {publishingCms ? "Publishing..." : "Publish"}
                     </Button>
                     <Button
                       type="button"

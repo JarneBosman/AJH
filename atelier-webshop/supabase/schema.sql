@@ -69,6 +69,30 @@ alter table public.categories
 alter table public.categories
   add column if not exists description_nl text;
 
+update public.categories
+set
+  name_nl = coalesce(name_nl, 'Tafels'),
+  description_nl = coalesce(description_nl, 'Blikvanger eettafels en werktafels, gemaakt van massief hardhout.')
+where slug = 'tables';
+
+update public.categories
+set
+  name_nl = coalesce(name_nl, 'Stoelen'),
+  description_nl = coalesce(description_nl, 'Comfortgerichte zitmeubelen met exclusieve stoffen en verfijnde houtverbindingen.')
+where slug = 'chairs';
+
+update public.categories
+set
+  name_nl = coalesce(name_nl, 'Kasten'),
+  description_nl = coalesce(description_nl, 'Architectonische opbergsystemen, afgestemd op jouw interieur.')
+where slug = 'cabinets';
+
+update public.categories
+set
+  name_nl = coalesce(name_nl, 'Wandrekken'),
+  description_nl = coalesce(description_nl, 'Modulaire wandrekken met hoogwaardige afwerking voor rustige, stijlvolle ruimtes.')
+where slug = 'shelving';
+
 create table if not exists public.admin_users (
   user_id uuid primary key references auth.users(id) on delete cascade,
   created_at timestamptz not null default now()

@@ -9,31 +9,42 @@ export const categories: ProductCategory[] = [
   {
     slug: "tables",
     name: "Tables",
+    nameNl: "Tafels",
     description:
       "Statement dining and work tables crafted from solid hardwoods.",
+    descriptionNl:
+      "Blikvanger eettafels en werktafels, gemaakt van massief hardhout.",
     heroImage:
       "https://images.unsplash.com/photo-1595515106864-0779d49f9502?auto=format&fit=crop&w=1400&q=80",
   },
   {
     slug: "chairs",
     name: "Chairs",
+    nameNl: "Stoelen",
     description:
       "Comfort-driven seating with bespoke fabrics and sculpted joinery.",
+    descriptionNl:
+      "Comfortgerichte zitmeubelen met exclusieve stoffen en verfijnde houtverbindingen.",
     heroImage:
       "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1400&q=80",
   },
   {
     slug: "cabinets",
     name: "Cabinets",
+    nameNl: "Kasten",
     description: "Architectural storage systems tailored to your interior palette.",
+    descriptionNl: "Architectonische opbergsystemen, afgestemd op jouw interieur.",
     heroImage:
       "https://images.unsplash.com/photo-1616628182509-6f4f7f92716f?auto=format&fit=crop&w=1400&q=80",
   },
   {
     slug: "shelving",
     name: "Shelving",
+    nameNl: "Wandrekken",
     description:
       "Modular shelving with premium finishes for quiet, elevated spaces.",
+    descriptionNl:
+      "Modulaire wandrekken met hoogwaardige afwerking voor rustige, stijlvolle ruimtes.",
     heroImage:
       "https://images.unsplash.com/photo-1616486029423-aaa4789e8c9a?auto=format&fit=crop&w=1400&q=80",
   },
