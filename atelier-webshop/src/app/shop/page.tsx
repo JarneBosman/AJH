@@ -1,21 +1,29 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { ProductCard } from "@/components/shop/product-card";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { getAllCategoriesFromStore } from "@/lib/categories-repository";
+import { localizeCategory, localizeProduct } from "@/lib/content-localization";
 import { getAllProducts } from "@/lib/products-repository";
+import { getTranslations, languageCookieName, normalizeLanguage } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
 export default async function ShopPage() {
-  const products = await getAllProducts();
-  const categories = await getAllCategoriesFromStore();
+  const cookieStore = await cookies();
+  const language = normalizeLanguage(cookieStore.get(languageCookieName)?.value);
+  const t = getTranslations(language);
+  const products = (await getAllProducts()).map((product) => localizeProduct(product, language));
+  const categories = (await getAllCategoriesFromStore()).map((category) =>
+    localizeCategory(category, language),
+  );
 
   return (
     <section className="mx-auto w-full max-w-7xl px-6 pb-20 pt-12 md:px-10">
       <SectionHeading
-        eyebrow="Collection"
-        title="Browse the webshop"
-        description="Explore handcrafted pieces across tables, chairs, cabinets, and shelving."
+        eyebrow={t.shopEyebrow}
+        title={t.shopTitle}
+        description={t.shopDescription}
       />
 
       <div className="mt-7 flex flex-wrap gap-2">

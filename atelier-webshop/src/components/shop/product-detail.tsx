@@ -9,6 +9,8 @@ import { useCart } from "@/context/cart-context";
 import { ImageGallery } from "@/components/shop/image-gallery";
 import { OptionSelector } from "@/components/shop/option-selector";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/context/i18n-context";
+import { withPlaceholders } from "@/lib/i18n";
 
 interface ProductDetailProps {
   product: Product;
@@ -23,6 +25,7 @@ const buildLineKey = (productId: string, selectedMap: Record<string, string>) =>
 };
 
 export const ProductDetail = ({ product, options }: ProductDetailProps) => {
+  const { language, t } = useI18n();
   const [selectedMap, setSelectedMap] = useState<Record<string, string>>(
     product.defaultSelections,
   );
@@ -31,8 +34,8 @@ export const ProductDetail = ({ product, options }: ProductDetailProps) => {
   const { addItem } = useCart();
 
   const { selections, dynamicPrice } = useMemo(
-    () => calculateProductPrice(product.basePrice, options, selectedMap),
-    [options, product.basePrice, selectedMap],
+    () => calculateProductPrice(product.basePrice, options, selectedMap, language),
+    [language, options, product.basePrice, selectedMap],
   );
 
   useEffect(() => {
@@ -86,7 +89,7 @@ export const ProductDetail = ({ product, options }: ProductDetailProps) => {
           href={`/shop/${product.category}`}
           className="rounded-full border border-black/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-ink)] transition hover:border-[var(--color-wood)]"
         >
-          Back to category
+          {t.productBackToCategory}
         </Link>
       </div>
 
@@ -96,13 +99,16 @@ export const ProductDetail = ({ product, options }: ProductDetailProps) => {
         <div className="space-y-8">
           <div className="rounded-3xl border border-black/5 bg-white p-6 shadow-[0_20px_50px_-40px_rgba(0,0,0,0.4)]">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-muted)]">
-              Dynamic price
+              {t.productDynamicPrice}
             </p>
             <p className="mt-2 text-4xl font-semibold tracking-tight text-[var(--color-ink)]">
               {formatCurrency(dynamicPrice)}
             </p>
             <p className="mt-2 text-sm text-[var(--color-muted)]">
-              Base price {formatCurrency(product.basePrice)}. Lead time {product.leadTime}.
+              {withPlaceholders(t.productPriceMeta, {
+                basePrice: formatCurrency(product.basePrice),
+                leadTime: product.leadTime,
+              })}
             </p>
           </div>
 
@@ -120,12 +126,12 @@ export const ProductDetail = ({ product, options }: ProductDetailProps) => {
             
             <div className="border-t border-black/5 pt-6">
               <label className="block text-sm font-medium text-[var(--color-ink)]">
-                Add a note about your customization
+                {t.productAddNote}
               </label>
               <textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                placeholder="E.g., 'Please ensure precise measurements' or 'Preferred delivery date: April 15'"
+                placeholder={t.productNotePlaceholder}
                 className="mt-2 w-full rounded-2xl border border-black/10 bg-[var(--color-neutral-100)] px-4 py-3 text-sm text-[var(--color-ink)] placeholder-[var(--color-muted)] transition focus:border-[var(--color-wood)] focus:outline-none focus:ring-1 focus:ring-[var(--color-wood)]/20"
                 rows={3}
               />
@@ -134,7 +140,7 @@ export const ProductDetail = ({ product, options }: ProductDetailProps) => {
 
           <div className="rounded-3xl border border-black/5 bg-[var(--color-neutral-100)] p-6">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-muted)]">
-              Live preview cues
+              {t.productLivePreview}
             </p>
             <div className="mt-4 rounded-2xl border border-white/80 bg-white p-4">
               <div className="flex items-center gap-3">
@@ -143,7 +149,7 @@ export const ProductDetail = ({ product, options }: ProductDetailProps) => {
                   style={{ backgroundColor: highlightTone }}
                 />
                 <span className="text-sm text-[var(--color-ink)]">
-                  Material and finish update in real-time while you configure.
+                  {t.productPreviewDescription}
                 </span>
               </div>
               <ul className="mt-4 space-y-2 text-sm text-[var(--color-muted)]">
@@ -160,16 +166,16 @@ export const ProductDetail = ({ product, options }: ProductDetailProps) => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={onAddToCart}>Add to cart</Button>
+            <Button onClick={onAddToCart}>{t.productAddToCart}</Button>
             <Button
               variant="secondary"
               onClick={() => setSelectedMap(product.defaultSelections)}
             >
-              Reset options
+              {t.productResetOptions}
             </Button>
             {addedMessageVisible ? (
               <span className="text-sm font-medium text-[var(--color-wood-dark)]" role="status">
-                Added to cart
+                {t.productAddedToCart}
               </span>
             ) : null}
           </div>

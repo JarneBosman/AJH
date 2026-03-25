@@ -1,16 +1,26 @@
 import Image from "next/image";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { ProductCard } from "@/components/shop/product-card";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { Button } from "@/components/ui/button";
 import { getAllCategoriesFromStore } from "@/lib/categories-repository";
+import { localizeCategory, localizeProduct } from "@/lib/content-localization";
 import { getFeaturedProducts } from "@/lib/products-repository";
+import { getTranslations, languageCookieName, normalizeLanguage } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const featuredProducts = await getFeaturedProducts();
-  const categories = await getAllCategoriesFromStore();
+  const cookieStore = await cookies();
+  const language = normalizeLanguage(cookieStore.get(languageCookieName)?.value);
+  const t = getTranslations(language);
+  const featuredProducts = (await getFeaturedProducts()).map((product) =>
+    localizeProduct(product, language),
+  );
+  const categories = (await getAllCategoriesFromStore()).map((category) =>
+    localizeCategory(category, language),
+  );
 
   return (
     <div className="pb-20">
@@ -20,21 +30,20 @@ export default async function Home() {
       >
         <div data-home-hero-copy className="animate-rise max-w-xl space-y-6">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-wood)]">
-            Custom furniture workshop
+            {t.homeHeroEyebrow}
           </p>
           <h1 className="text-balance text-5xl font-semibold leading-tight tracking-tight text-[var(--color-ink)] md:text-6xl">
-            Handmade furniture with tailored craftsmanship.
+            {t.homeHeroTitle}
           </h1>
           <p className="text-pretty text-base leading-8 text-[var(--color-muted)] md:text-lg">
-            Discover solid wood pieces crafted in small batches and configured to
-            your exact space, finish, and style.
+            {t.homeHeroDescription}
           </p>
           <div data-home-hero-actions className="flex flex-wrap gap-3">
             <Link href="/shop">
-              <Button>Browse collection</Button>
+              <Button>{t.homeHeroPrimaryCta}</Button>
             </Link>
             <Link href="/configurator">
-              <Button variant="secondary">Start configurator</Button>
+              <Button variant="secondary">{t.homeHeroSecondaryCta}</Button>
             </Link>
           </div>
         </div>
@@ -58,9 +67,9 @@ export default async function Home() {
 
       <section className="mx-auto mt-12 w-full max-w-7xl px-6 md:px-10">
         <SectionHeading
-          eyebrow="Featured"
-          title="Signature pieces"
-          description="Our most requested handcrafted designs, each customizable per category."
+          eyebrow={t.homeFeaturedEyebrow}
+          title={t.homeFeaturedTitle}
+          description={t.homeFeaturedDescription}
         />
 
         <div className="mt-8 grid gap-6 md:grid-cols-3">
@@ -72,9 +81,9 @@ export default async function Home() {
 
       <section className="mx-auto mt-20 w-full max-w-7xl px-6 md:px-10">
         <SectionHeading
-          eyebrow="Categories"
-          title="Shop by furniture type"
-          description="Each category includes dedicated customization logic and tailored finishing options."
+          eyebrow={t.homeCategoriesEyebrow}
+          title={t.homeCategoriesTitle}
+          description={t.homeCategoriesDescription}
         />
 
         <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -109,14 +118,14 @@ export default async function Home() {
       <section className="mx-auto mt-20 w-full max-w-7xl px-6 md:px-10">
         <div className="rounded-[2rem] border border-black/5 bg-white p-8 md:p-12">
           <SectionHeading
-            eyebrow="Brand story"
-            title="Built slowly, made to last"
-            description="We partner with local sawmills and shape every piece by hand. Grain, tone, and detail are treated as unique characteristics, never defects."
+            eyebrow={t.homeStoryEyebrow}
+            title={t.homeStoryTitle}
+            description={t.homeStoryDescription}
           />
           <div className="mt-8 grid gap-4 text-sm text-[var(--color-muted)] md:grid-cols-3">
-            <p>Solid hardwood construction with durable natural oils.</p>
-            <p>Custom dimensions and finishes tailored to your interior.</p>
-            <p>Transparent craftsmanship and made-to-order production.</p>
+            <p>{t.homeStoryPointOne}</p>
+            <p>{t.homeStoryPointTwo}</p>
+            <p>{t.homeStoryPointThree}</p>
           </div>
         </div>
       </section>

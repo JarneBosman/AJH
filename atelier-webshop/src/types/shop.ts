@@ -6,6 +6,7 @@ export type OptionInputType = "dropdown" | "toggle" | "swatch";
 export interface CustomizationChoice {
   id: string;
   label: string;
+  labelNl?: string;
   description?: string;
   priceModifier: number;
   swatchHex?: string;
@@ -14,7 +15,9 @@ export interface CustomizationChoice {
 export interface CustomizationOption {
   id: string;
   label: string;
+  labelNl?: string;
   helperText?: string;
+  helperTextNl?: string;
   type: OptionInputType;
   choices: CustomizationChoice[];
 }
@@ -22,7 +25,9 @@ export interface CustomizationOption {
 export interface ProductCategory {
   slug: CategorySlug;
   name: string;
+  nameNl?: string;
   description: string;
+  descriptionNl?: string;
   heroImage: string;
 }
 
@@ -30,14 +35,19 @@ export interface Product {
   id: string;
   slug: string;
   name: string;
+  nameNl?: string;
   subtitle: string;
+  subtitleNl?: string;
   description: string;
+  descriptionNl?: string;
   category: CategorySlug;
   basePrice: number;
   leadTime: string;
+  leadTimeNl?: string;
   images: string[];
   featured?: boolean;
   story?: string;
+  storyNl?: string;
   defaultSelections: Record<string, string>;
   customOptions?: CustomizationOption[];
 }

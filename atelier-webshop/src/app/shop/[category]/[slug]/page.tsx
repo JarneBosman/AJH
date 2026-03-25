@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { getCustomizationOptions } from "@/data/shop-data";
 import { Providers } from "@/components/providers";
 import { ProductDetail } from "@/components/shop/product-detail";
+import { localizeProduct } from "@/lib/content-localization";
 import { getProductBySlugFromStore } from "@/lib/products-repository";
+import { languageCookieName, normalizeLanguage } from "@/lib/i18n";
 import { CustomizationOption } from "@/types/shop";
 
 export const dynamic = "force-dynamic";
@@ -42,12 +45,17 @@ export default async function ProductPage({
 }: {
   params: Promise<{ category: string; slug: string }>;
 }) {
-  const { category, slug } = await params;
-  const product = await getProductBySlugFromStore(slug);
+  const cookieStore = await cookies();
+  const language = normalizeLanguage(cookieStore.get(languageCookieName)?.value);
 
-  if (!product || product.category !== category) {
+  const { category, slug } = await params;
+  const sourceProduct = await getProductBySlugFromStore(slug);
+
+  if (!sourceProduct || sourceProduct.category !== category) {
     notFound();
   }
+
+  const product = localizeProduct(sourceProduct, language);
 
   const baseOptions = getCustomizationOptions(product.category);
   const customOptions = product.customOptions ?? [];

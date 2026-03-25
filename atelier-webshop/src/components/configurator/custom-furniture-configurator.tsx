@@ -15,19 +15,13 @@ import { formatCurrency } from "@/lib/format";
 import { useCart } from "@/context/cart-context";
 import { Button } from "@/components/ui/button";
 import { OptionSelector } from "@/components/shop/option-selector";
+import { useI18n } from "@/context/i18n-context";
 
 const CONFIGURATOR_BASE_PRICE = 1390;
 
 const configOptions = customizationOptionsByCategory.tables.filter((entry) =>
   ["material"].includes(entry.id),
 );
-
-const steps = [
-  "Base type",
-  "Dimensions",
-  "Materials",
-  "Review & add",
-] as const;
 
 const buildLineKey = (
   baseType: string,
@@ -41,6 +35,7 @@ const buildLineKey = (
 };
 
 export const CustomFurnitureConfigurator = () => {
+  const { language, t } = useI18n();
   const [stepIndex, setStepIndex] = useState(0);
   const [baseType, setBaseType] = useState(configuratorBaseTypes[0].id);
   const [dimensions, setDimensions] = useState({ ...baselineDimensions });
@@ -51,13 +46,20 @@ export const CustomFurnitureConfigurator = () => {
   const [statusMessage, setStatusMessage] = useState("");
   const { addItem } = useCart();
 
+  const steps = [
+    t.configStepBaseType,
+    t.configStepDimensions,
+    t.configStepMaterials,
+    t.configStepReview,
+  ] as const;
+
   const currentBaseType =
     configuratorBaseTypes.find((entry) => entry.id === baseType) ||
     configuratorBaseTypes[0];
 
   const selections = useMemo(
-    () => resolveSelections(configOptions, selectedMap),
-    [selectedMap],
+    () => resolveSelections(configOptions, selectedMap, language),
+    [language, selectedMap],
   );
 
   const selectionsPrice = useMemo(
@@ -103,7 +105,7 @@ export const CustomFurnitureConfigurator = () => {
       dimensions,
       ...(comment && { comment }),
     });
-    setStatusMessage("Custom piece added to cart");
+    setStatusMessage(t.configAddedToCart);
     setComment("");
     window.setTimeout(() => setStatusMessage(""), 1800);
   };
@@ -112,15 +114,13 @@ export const CustomFurnitureConfigurator = () => {
     <section className="mx-auto w-full max-w-7xl px-6 pb-20 pt-12 md:px-10">
       <header className="max-w-3xl">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-wood)]">
-          Bespoke configurator
+          {t.configEyebrow}
         </p>
         <h1 className="mt-3 text-balance text-4xl font-semibold tracking-tight text-[var(--color-ink)] md:text-5xl">
-          Design your custom furniture piece
+          {t.configTitle}
         </h1>
         <p className="mt-4 text-pretty text-base leading-7 text-[var(--color-muted)]">
-          Build your ideal table in a guided flow inspired by premium furniture
-          configurators. Every selection updates pricing and preview cues in real
-          time.
+          {t.configDescription}
         </p>
       </header>
 
@@ -143,22 +143,22 @@ export const CustomFurnitureConfigurator = () => {
 
           <div className="rounded-2xl bg-[var(--color-neutral-100)] p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-muted)]">
-              Live estimate
+              {t.configLiveEstimate}
             </p>
             <p className="mt-2 text-3xl font-semibold tracking-tight text-[var(--color-ink)]">
               {formatCurrency(totalPrice)}
             </p>
             <ul className="mt-4 space-y-2 text-sm text-[var(--color-muted)]">
               <li className="flex justify-between">
-                <span>Base model</span>
+                <span>{t.configBaseModel}</span>
                 <span>{formatCurrency(CONFIGURATOR_BASE_PRICE)}</span>
               </li>
               <li className="flex justify-between">
-                <span>Base type adjustment</span>
+                <span>{t.configBaseTypeAdjustment}</span>
                 <span>{formatCurrency(currentBaseType.priceModifier)}</span>
               </li>
               <li className="flex justify-between">
-                <span>Options adjustment</span>
+                <span>{t.configOptionsAdjustment}</span>
                 <span>{formatCurrency(selectionsPrice)}</span>
               </li>
             </ul>
@@ -166,7 +166,7 @@ export const CustomFurnitureConfigurator = () => {
 
           <div className="rounded-2xl border border-black/5 bg-white p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-muted)]">
-              Visual preview
+              {t.configVisualPreview}
             </p>
             <div className="mt-4 rounded-2xl border border-black/5 bg-[#f4f0ea] p-4">
               <div
@@ -189,7 +189,7 @@ export const CustomFurnitureConfigurator = () => {
           {stepIndex === 0 ? (
             <section className="space-y-3">
               <h2 className="text-xl font-semibold text-[var(--color-ink)]">
-                Select base type
+                {t.configSelectBaseType}
               </h2>
               <div className="grid gap-3 sm:grid-cols-3">
                 {configuratorBaseTypes.map((type) => (
@@ -219,7 +219,7 @@ export const CustomFurnitureConfigurator = () => {
           {stepIndex === 1 ? (
             <section className="space-y-5">
               <h2 className="text-xl font-semibold text-[var(--color-ink)]">
-                Adjust dimensions
+                {t.configAdjustDimensions}
               </h2>
               <label className="block space-y-2 text-sm text-[var(--color-ink)]">
                 <span>Width ({dimensions.width} cm)</span>
@@ -275,7 +275,7 @@ export const CustomFurnitureConfigurator = () => {
           {stepIndex === 2 ? (
             <section className="space-y-6">
               <h2 className="text-xl font-semibold text-[var(--color-ink)]">
-                Select materials & finish
+                {t.configSelectMaterials}
               </h2>
               {configOptions.map((option) => (
                 <OptionSelector
@@ -296,7 +296,7 @@ export const CustomFurnitureConfigurator = () => {
           {stepIndex === 3 ? (
             <section className="space-y-4">
               <h2 className="text-xl font-semibold text-[var(--color-ink)]">
-                Review configuration
+                {t.configReviewConfiguration}
               </h2>
               <ul className="space-y-2 text-sm text-[var(--color-muted)]">
                 <li className="flex justify-between">
@@ -323,18 +323,18 @@ export const CustomFurnitureConfigurator = () => {
 
               <div className="rounded-2xl border border-black/5 bg-[var(--color-neutral-100)] p-4">
                 <label className="block text-sm font-medium text-[var(--color-ink)]">
-                  Add a note about your customization
+                  {t.configAddNote}
                 </label>
                 <textarea
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
-                  placeholder="E.g., 'Please ensure precise measurements' or 'Preferred delivery date: April 15'"
+                  placeholder={t.configNotePlaceholder}
                   className="mt-2 w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-[var(--color-ink)] placeholder-[var(--color-muted)] transition focus:border-[var(--color-wood)] focus:outline-none focus:ring-1 focus:ring-[var(--color-wood)]/20"
                   rows={3}
                 />
               </div>
 
-              <Button onClick={addConfiguredItem}>Add custom piece to cart</Button>
+              <Button onClick={addConfiguredItem}>{t.configAddCustomToCart}</Button>
               {statusMessage ? (
                 <p className="text-sm font-medium text-[var(--color-wood-dark)]" role="status">
                   {statusMessage}
@@ -345,10 +345,10 @@ export const CustomFurnitureConfigurator = () => {
 
           <div className="flex items-center justify-between border-t border-black/5 pt-4">
             <Button variant="ghost" onClick={previousStep} disabled={stepIndex === 0}>
-              Previous
+              {t.configPrevious}
             </Button>
             <Button onClick={nextStep} disabled={stepIndex === steps.length - 1}>
-              Next step
+              {t.configNext}
             </Button>
           </div>
         </div>

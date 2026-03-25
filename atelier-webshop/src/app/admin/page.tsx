@@ -10,15 +10,20 @@ import { OptionInputType } from "@/types/shop";
 interface ProductRow {
   id: string;
   name: string;
+  name_nl: string | null;
   slug: string;
   category: string;
   base_price: number;
   subtitle: string;
+  subtitle_nl: string | null;
   description: string;
+  description_nl: string | null;
   lead_time: string;
+  lead_time_nl: string | null;
   images: unknown;
   featured: boolean;
   story: string | null;
+  story_nl: string | null;
   default_selections: unknown;
   custom_options: unknown;
 }
@@ -29,14 +34,18 @@ interface CategoryRow {
   id: string;
   slug: string;
   name: string;
+  name_nl: string | null;
   description: string;
+  description_nl: string | null;
   hero_image: string;
 }
 
 interface NewCategoryState {
   name: string;
+  nameNl: string;
   slug: string;
   description: string;
+  descriptionNl: string;
   heroImage: string;
 }
 
@@ -69,21 +78,28 @@ interface AppearanceScheme {
 
 interface NewProductState {
   name: string;
+  nameNl: string;
   slug: string;
   category: ProductCategory;
   basePrice: string;
   subtitle: string;
+  subtitleNl: string;
   description: string;
+  descriptionNl: string;
   leadTime: string;
+  leadTimeNl: string;
   images: string;
   featured: boolean;
   story: string;
+  storyNl: string;
 }
 
 const createInitialCategoryState = (): NewCategoryState => ({
   name: "",
+  nameNl: "",
   slug: "",
   description: "",
+  descriptionNl: "",
   heroImage: "",
 });
 
@@ -113,6 +129,7 @@ interface CustomOptionChoiceForm {
   formId: string;
   id: string;
   label: string;
+  labelNl: string;
   priceModifier: string;
   swatchHex: string;
 }
@@ -121,7 +138,9 @@ interface CustomOptionForm {
   formId: string;
   id: string;
   label: string;
+  labelNl: string;
   helperText: string;
+  helperTextNl: string;
   type: OptionInputType;
   choices: CustomOptionChoiceForm[];
 }
@@ -151,6 +170,7 @@ const createCustomChoiceForm = (): CustomOptionChoiceForm => ({
   formId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
   id: "",
   label: "",
+  labelNl: "",
   priceModifier: "0",
   swatchHex: "",
 });
@@ -159,7 +179,9 @@ const createCustomOptionForm = (): CustomOptionForm => ({
   formId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
   id: "",
   label: "",
+  labelNl: "",
   helperText: "",
+  helperTextNl: "",
   type: "dropdown",
   choices: [createCustomChoiceForm()],
 });
@@ -178,15 +200,20 @@ const toColorInputValue = (value: string) => {
 
 const createInitialProductState = (): NewProductState => ({
   name: "",
+  nameNl: "",
   slug: "",
   category: "tables",
   basePrice: "",
   subtitle: "",
+  subtitleNl: "",
   description: "",
+  descriptionNl: "",
   leadTime: "6-8 weeks",
+  leadTimeNl: "",
   images: "",
   featured: false,
   story: "",
+  storyNl: "",
 });
 
 const fieldClassName =
@@ -476,7 +503,7 @@ export default function AdminPage() {
 
       const { data, error: queryError } = await supabase
         .from("categories" as never)
-        .select("id, slug, name, description, hero_image")
+        .select("id, slug, name, name_nl, description, description_nl, hero_image")
         .order("created_at", { ascending: true });
 
       if (queryError) {
@@ -728,7 +755,7 @@ export default function AdminPage() {
       const { data, error: queryError } = await supabase
         .from("products")
         .select(
-          "id, name, slug, category, base_price, subtitle, description, lead_time, images, featured, story, default_selections, custom_options",
+          "id, name, name_nl, slug, category, base_price, subtitle, subtitle_nl, description, description_nl, lead_time, lead_time_nl, images, featured, story, story_nl, default_selections, custom_options",
         )
         .order("created_at", { ascending: false });
 
@@ -786,8 +813,10 @@ export default function AdminPage() {
     event.preventDefault();
 
     const name = categoryForm.name.trim();
+    const nameNl = categoryForm.nameNl.trim();
     const slug = slugify(categoryForm.slug || categoryForm.name);
     const description = categoryForm.description.trim();
+    const descriptionNl = categoryForm.descriptionNl.trim();
 
     if (!name || !slug) {
       setCategoryError("Category name and slug are required.");
@@ -814,8 +843,10 @@ export default function AdminPage() {
           .from("categories")
           .update({
             name,
+            name_nl: nameNl || null,
             slug,
             description,
+            description_nl: descriptionNl || null,
             hero_image: categoryForm.heroImage.trim(),
           })
           .eq("id", editingCategoryId);
@@ -827,8 +858,10 @@ export default function AdminPage() {
       } else {
         const { error: insertError } = await (supabase as any).from("categories").insert({
           name,
+          name_nl: nameNl || null,
           slug,
           description,
+          description_nl: descriptionNl || null,
           hero_image: categoryForm.heroImage.trim(),
         });
 
@@ -893,8 +926,10 @@ export default function AdminPage() {
     setCategoryError("");
     setCategoryForm({
       name: category.name,
+      nameNl: category.name_nl ?? "",
       slug: category.slug,
       description: category.description,
+      descriptionNl: category.description_nl ?? "",
       heroImage: category.hero_image,
     });
   };
@@ -1077,7 +1112,10 @@ export default function AdminPage() {
       .map((option) => {
         const id = typeof option.id === "string" ? option.id : "";
         const label = typeof option.label === "string" ? option.label : "";
+        const labelNl = typeof option.labelNl === "string" ? option.labelNl : "";
         const helperText = typeof option.helperText === "string" ? option.helperText : "";
+        const helperTextNl =
+          typeof option.helperTextNl === "string" ? option.helperTextNl : "";
         const type =
           option.type === "dropdown" || option.type === "toggle" || option.type === "swatch"
             ? option.type
@@ -1090,6 +1128,7 @@ export default function AdminPage() {
             formId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
             id: typeof choice.id === "string" ? choice.id : "",
             label: typeof choice.label === "string" ? choice.label : "",
+            labelNl: typeof choice.labelNl === "string" ? choice.labelNl : "",
             priceModifier: String(Number(choice.priceModifier ?? 0)),
             swatchHex: typeof choice.swatchHex === "string" ? choice.swatchHex : "",
           }))
@@ -1099,7 +1138,9 @@ export default function AdminPage() {
           formId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
           id,
           label,
+          labelNl,
           helperText,
+          helperTextNl,
           type: type as OptionInputType,
           choices: choices.length > 0 ? choices : [createCustomChoiceForm()],
         };
@@ -1109,15 +1150,20 @@ export default function AdminPage() {
     setEditingProductId(product.id);
     setProductForm({
       name: product.name,
+      nameNl: product.name_nl ?? "",
       slug: product.slug,
       category: normalizedCategory,
       basePrice: String(product.base_price),
       subtitle: product.subtitle,
+      subtitleNl: product.subtitle_nl ?? "",
       description: product.description,
+      descriptionNl: product.description_nl ?? "",
       leadTime: product.lead_time,
+      leadTimeNl: product.lead_time_nl ?? "",
       images: imageList.join("\n"),
       featured: Boolean(product.featured),
       story: product.story ?? "",
+      storyNl: product.story_nl ?? "",
     });
     setDefaultSelectionRows(
       defaultSelectionEntries.length > 0
@@ -1136,7 +1182,7 @@ export default function AdminPage() {
 
   const updateCustomOptionField = (
     optionFormId: string,
-    field: "id" | "label" | "helperText" | "type",
+    field: "id" | "label" | "labelNl" | "helperText" | "helperTextNl" | "type",
     value: string,
   ) => {
     setCustomOptionsForm((previous) =>
@@ -1162,7 +1208,7 @@ export default function AdminPage() {
   const updateCustomChoiceField = (
     optionFormId: string,
     choiceFormId: string,
-    field: "id" | "label" | "priceModifier" | "swatchHex",
+    field: "id" | "label" | "labelNl" | "priceModifier" | "swatchHex",
     value: string,
   ) => {
     setCustomOptionsForm((previous) =>
@@ -1316,10 +1362,14 @@ export default function AdminPage() {
     }
 
     const name = productForm.name.trim();
+    const nameNl = productForm.nameNl.trim();
     const slug = slugify(productForm.slug);
     const subtitle = productForm.subtitle.trim();
+    const subtitleNl = productForm.subtitleNl.trim();
     const description = productForm.description.trim();
+    const descriptionNl = productForm.descriptionNl.trim();
     const leadTime = productForm.leadTime.trim();
+    const leadTimeNl = productForm.leadTimeNl.trim();
 
     if (!name || !slug || !subtitle || !description || !leadTime) {
       setCreateError("Please fill all required product fields.");
@@ -1341,11 +1391,14 @@ export default function AdminPage() {
     const customOptionsPayload: Array<{
       id: string;
       label: string;
+      labelNl?: string;
       helperText?: string;
+      helperTextNl?: string;
       type: OptionInputType;
       choices: Array<{
         id: string;
         label: string;
+        labelNl?: string;
         priceModifier: number;
         swatchHex?: string;
       }>;
@@ -1354,16 +1407,21 @@ export default function AdminPage() {
     for (const option of customOptionsForm) {
       const normalizedId = normalizeOptionId(option.id);
       const label = option.label.trim();
+      const labelNl = option.labelNl.trim();
       const helperText = option.helperText.trim();
+      const helperTextNl = option.helperTextNl.trim();
 
       const hasAnyData =
         normalizedId.length > 0 ||
         label.length > 0 ||
+        labelNl.length > 0 ||
         helperText.length > 0 ||
+        helperTextNl.length > 0 ||
         option.choices.some(
           (choice) =>
             choice.id.trim().length > 0 ||
             choice.label.trim().length > 0 ||
+            choice.labelNl.trim().length > 0 ||
             choice.swatchHex.trim().length > 0 ||
             choice.priceModifier.trim().length > 0,
         );
@@ -1376,6 +1434,7 @@ export default function AdminPage() {
         .map((choice) => {
           const choiceId = normalizeOptionId(choice.id);
           const choiceLabel = choice.label.trim();
+          const choiceLabelNl = choice.labelNl.trim();
 
           if (!choiceId || !choiceLabel) {
             return null;
@@ -1384,6 +1443,7 @@ export default function AdminPage() {
           return {
             id: choiceId,
             label: choiceLabel,
+            ...(choiceLabelNl ? { labelNl: choiceLabelNl } : {}),
             priceModifier: Number(choice.priceModifier || 0),
             ...(choice.swatchHex.trim() ? { swatchHex: choice.swatchHex.trim() } : {}),
           };
@@ -1401,7 +1461,9 @@ export default function AdminPage() {
       customOptionsPayload.push({
         id: normalizedId,
         label,
+        ...(labelNl ? { labelNl } : {}),
         ...(helperText ? { helperText } : {}),
+        ...(helperTextNl ? { helperTextNl } : {}),
         type: option.type,
         choices,
       });
@@ -1415,14 +1477,19 @@ export default function AdminPage() {
       const productPayload = {
         slug,
         name,
+        name_nl: nameNl || null,
         subtitle,
+        subtitle_nl: subtitleNl || null,
         description,
+        description_nl: descriptionNl || null,
         category: productForm.category,
         base_price: basePriceNumber,
         lead_time: leadTime,
+        lead_time_nl: leadTimeNl || null,
         images,
         featured: productForm.featured,
         story: productForm.story.trim() || null,
+        story_nl: productForm.storyNl.trim() || null,
         default_selections: defaultSelections,
         custom_options: customOptionsPayload,
       };
@@ -1809,7 +1876,7 @@ export default function AdminPage() {
 
           <form onSubmit={handleCreateCategory} className="mt-5 grid gap-3 md:grid-cols-2">
             <div>
-              <label className="text-sm font-medium text-[var(--color-ink)]">Category Name *</label>
+              <label className="text-sm font-medium text-[var(--color-ink)]">Category Name EN *</label>
               <input
                 className={fieldClassName}
                 value={categoryForm.name}
@@ -1822,6 +1889,21 @@ export default function AdminPage() {
                 }
                 placeholder="Benches"
                 required
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-[var(--color-ink)]">Category Name NL</label>
+              <input
+                className={fieldClassName}
+                value={categoryForm.nameNl}
+                onChange={(event) =>
+                  setCategoryForm((previous) => ({
+                    ...previous,
+                    nameNl: event.target.value,
+                  }))
+                }
+                placeholder="Banken"
               />
             </div>
 
@@ -1841,8 +1923,8 @@ export default function AdminPage() {
               />
             </div>
 
-            <div className="md:col-span-2">
-              <label className="text-sm font-medium text-[var(--color-ink)]">Description</label>
+            <div>
+              <label className="text-sm font-medium text-[var(--color-ink)]">Description EN</label>
               <textarea
                 className={fieldClassName}
                 rows={2}
@@ -1854,6 +1936,22 @@ export default function AdminPage() {
                   }))
                 }
                 placeholder="Compact and versatile seating pieces."
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-[var(--color-ink)]">Description NL</label>
+              <textarea
+                className={fieldClassName}
+                rows={2}
+                value={categoryForm.descriptionNl}
+                onChange={(event) =>
+                  setCategoryForm((previous) => ({
+                    ...previous,
+                    descriptionNl: event.target.value,
+                  }))
+                }
+                placeholder="Compacte en veelzijdige zitmeubels."
               />
             </div>
 
@@ -1907,6 +2005,9 @@ export default function AdminPage() {
                 >
                   <div>
                     <p className="text-sm font-semibold text-[var(--color-ink)]">{category.name}</p>
+                    {category.name_nl ? (
+                      <p className="text-xs text-[var(--color-muted)]">NL: {category.name_nl}</p>
+                    ) : null}
                     <p className="text-xs text-[var(--color-muted)]">/{category.slug}</p>
                   </div>
                   <div className="flex gap-2">
@@ -1947,7 +2048,7 @@ export default function AdminPage() {
 
           <form onSubmit={handleCreateProduct} className="mt-6 grid gap-4 md:grid-cols-2">
             <div>
-              <label className="text-sm font-medium text-[var(--color-ink)]">Name *</label>
+              <label className="text-sm font-medium text-[var(--color-ink)]">Name EN *</label>
               <input
                 className={fieldClassName}
                 value={productForm.name}
@@ -1961,6 +2062,21 @@ export default function AdminPage() {
                 }}
                 placeholder="Oak Dining Table"
                 required
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-[var(--color-ink)]">Name NL</label>
+              <input
+                className={fieldClassName}
+                value={productForm.nameNl}
+                onChange={(event) =>
+                  setProductForm((prev) => ({
+                    ...prev,
+                    nameNl: event.target.value,
+                  }))
+                }
+                placeholder="Eiken eettafel"
               />
             </div>
 
@@ -2022,7 +2138,7 @@ export default function AdminPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-[var(--color-ink)]">Subtitle *</label>
+              <label className="text-sm font-medium text-[var(--color-ink)]">Subtitle EN *</label>
               <input
                 className={fieldClassName}
                 value={productForm.subtitle}
@@ -2038,7 +2154,22 @@ export default function AdminPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-[var(--color-ink)]">Lead Time *</label>
+              <label className="text-sm font-medium text-[var(--color-ink)]">Subtitle NL</label>
+              <input
+                className={fieldClassName}
+                value={productForm.subtitleNl}
+                onChange={(event) =>
+                  setProductForm((prev) => ({
+                    ...prev,
+                    subtitleNl: event.target.value,
+                  }))
+                }
+                placeholder="Massief eiken, met de hand afgewerkt"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-[var(--color-ink)]">Lead Time EN *</label>
               <input
                 className={fieldClassName}
                 value={productForm.leadTime}
@@ -2053,8 +2184,23 @@ export default function AdminPage() {
               />
             </div>
 
-            <div className="md:col-span-2">
-              <label className="text-sm font-medium text-[var(--color-ink)]">Description *</label>
+            <div>
+              <label className="text-sm font-medium text-[var(--color-ink)]">Lead Time NL</label>
+              <input
+                className={fieldClassName}
+                value={productForm.leadTimeNl}
+                onChange={(event) =>
+                  setProductForm((prev) => ({
+                    ...prev,
+                    leadTimeNl: event.target.value,
+                  }))
+                }
+                placeholder="6-8 weken"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-[var(--color-ink)]">Description EN *</label>
               <textarea
                 className={fieldClassName}
                 rows={4}
@@ -2067,6 +2213,22 @@ export default function AdminPage() {
                 }
                 placeholder="A handcrafted oak dining table with natural oil finish."
                 required
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-[var(--color-ink)]">Description NL</label>
+              <textarea
+                className={fieldClassName}
+                rows={4}
+                value={productForm.descriptionNl}
+                onChange={(event) =>
+                  setProductForm((prev) => ({
+                    ...prev,
+                    descriptionNl: event.target.value,
+                  }))
+                }
+                placeholder="Een handgemaakte eiken eettafel met natuurlijke olie-afwerking."
               />
             </div>
 
@@ -2129,8 +2291,8 @@ export default function AdminPage() {
               />
             </div>
 
-            <div className="md:col-span-2">
-              <label className="text-sm font-medium text-[var(--color-ink)]">Story (optional)</label>
+            <div>
+              <label className="text-sm font-medium text-[var(--color-ink)]">Story EN (optional)</label>
               <textarea
                 className={fieldClassName}
                 rows={2}
@@ -2145,6 +2307,22 @@ export default function AdminPage() {
               />
             </div>
 
+            <div>
+              <label className="text-sm font-medium text-[var(--color-ink)]">Story NL (optioneel)</label>
+              <textarea
+                className={fieldClassName}
+                rows={2}
+                value={productForm.storyNl}
+                onChange={(event) =>
+                  setProductForm((prev) => ({
+                    ...prev,
+                    storyNl: event.target.value,
+                  }))
+                }
+                placeholder="Gemaakt door lokale vakmensen."
+              />
+            </div>
+
             <div className="md:col-span-2">
               <label className="text-sm font-medium text-[var(--color-ink)]">Custom Options</label>
               <p className="mt-2 text-xs text-[var(--color-muted)]">
@@ -2154,7 +2332,7 @@ export default function AdminPage() {
               <div className="mt-3 space-y-3">
                 {customOptionsForm.map((option) => (
                   <div key={option.formId} className="rounded-2xl border border-black/10 bg-white p-4">
-                    <div className="grid gap-2 md:grid-cols-2">
+                    <div className="grid gap-2 md:grid-cols-3">
                       <input
                         className="w-full rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm text-[var(--color-ink)] transition focus:border-[var(--color-wood)] focus:outline-none focus:ring-1 focus:ring-[var(--color-wood)]/20"
                         value={option.id}
@@ -2169,18 +2347,34 @@ export default function AdminPage() {
                         onChange={(event) =>
                           updateCustomOptionField(option.formId, "label", event.target.value)
                         }
-                        placeholder="Option label (e.g. Finish)"
+                        placeholder="Option label EN (e.g. Finish)"
+                      />
+                      <input
+                        className="w-full rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm text-[var(--color-ink)] transition focus:border-[var(--color-wood)] focus:outline-none focus:ring-1 focus:ring-[var(--color-wood)]/20"
+                        value={option.labelNl}
+                        onChange={(event) =>
+                          updateCustomOptionField(option.formId, "labelNl", event.target.value)
+                        }
+                        placeholder="Option label NL (bijv. Afwerking)"
                       />
                     </div>
 
-                    <div className="mt-2 grid gap-2 md:grid-cols-[1fr_220px_auto]">
+                    <div className="mt-2 grid gap-2 md:grid-cols-[1fr_1fr_220px_auto]">
                       <input
                         className="w-full rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm text-[var(--color-ink)] transition focus:border-[var(--color-wood)] focus:outline-none focus:ring-1 focus:ring-[var(--color-wood)]/20"
                         value={option.helperText}
                         onChange={(event) =>
                           updateCustomOptionField(option.formId, "helperText", event.target.value)
                         }
-                        placeholder="Helper text (optional)"
+                        placeholder="Helper text EN (optional)"
+                      />
+                      <input
+                        className="w-full rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm text-[var(--color-ink)] transition focus:border-[var(--color-wood)] focus:outline-none focus:ring-1 focus:ring-[var(--color-wood)]/20"
+                        value={option.helperTextNl}
+                        onChange={(event) =>
+                          updateCustomOptionField(option.formId, "helperTextNl", event.target.value)
+                        }
+                        placeholder="Helper text NL (optioneel)"
                       />
                       <select
                         className="w-full rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm text-[var(--color-ink)] transition focus:border-[var(--color-wood)] focus:outline-none focus:ring-1 focus:ring-[var(--color-wood)]/20"
@@ -2202,7 +2396,7 @@ export default function AdminPage() {
                       {option.choices.map((choice) => (
                         <div
                           key={choice.formId}
-                          className="grid gap-2 md:grid-cols-[1fr_1fr_140px_140px_64px_auto]"
+                          className="grid gap-2 md:grid-cols-[1fr_1fr_1fr_140px_140px_64px_auto]"
                         >
                           <input
                             className="w-full rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm text-[var(--color-ink)] transition focus:border-[var(--color-wood)] focus:outline-none focus:ring-1 focus:ring-[var(--color-wood)]/20"
@@ -2218,7 +2412,15 @@ export default function AdminPage() {
                             onChange={(event) =>
                               updateCustomChoiceField(option.formId, choice.formId, "label", event.target.value)
                             }
-                            placeholder="Choice label"
+                            placeholder="Choice label EN"
+                          />
+                          <input
+                            className="w-full rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm text-[var(--color-ink)] transition focus:border-[var(--color-wood)] focus:outline-none focus:ring-1 focus:ring-[var(--color-wood)]/20"
+                            value={choice.labelNl}
+                            onChange={(event) =>
+                              updateCustomChoiceField(option.formId, choice.formId, "labelNl", event.target.value)
+                            }
+                            placeholder="Choice label NL"
                           />
                           <input
                             className="w-full rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm text-[var(--color-ink)] transition focus:border-[var(--color-wood)] focus:outline-none focus:ring-1 focus:ring-[var(--color-wood)]/20"

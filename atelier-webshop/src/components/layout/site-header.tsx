@@ -1,12 +1,17 @@
-import Link from "next/link";
+"use client";
 
-const links = [
-  { href: "/shop", label: "Shop" },
-  { href: "/configurator", label: "Configurator" },
-  { href: "/cart", label: "Cart" },
-];
+import Link from "next/link";
+import { LanguageSwitcher } from "@/components/layout/language-switcher";
+import { useI18n } from "@/context/i18n-context";
 
 export const SiteHeader = ({ brandName = "Atelier Nord" }: { brandName?: string }) => {
+  const { t } = useI18n();
+  const links = [
+    { href: "/shop", label: t.navShop },
+    { href: "/configurator", label: t.navConfigurator },
+    { href: "/cart", label: t.navCart },
+  ];
+
   return (
     <header className="sticky top-0 z-40 border-b border-black/5 bg-white/90 backdrop-blur-xl">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4 md:px-10">
@@ -30,6 +35,7 @@ export const SiteHeader = ({ brandName = "Atelier Nord" }: { brandName?: string 
               {link.label}
             </Link>
           ))}
+          <LanguageSwitcher />
         </nav>
       </div>
     </header>

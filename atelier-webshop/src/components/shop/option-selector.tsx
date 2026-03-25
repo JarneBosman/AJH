@@ -2,6 +2,7 @@
 
 import { CustomizationOption } from "@/types/shop";
 import { cn } from "@/lib/cn";
+import { useI18n } from "@/context/i18n-context";
 
 interface OptionSelectorProps {
   option: CustomizationOption;
@@ -14,19 +15,27 @@ export const OptionSelector = ({
   selectedChoiceId,
   onChange,
 }: OptionSelectorProps) => {
+  const { language } = useI18n();
+  const optionLabel = language === "nl" && option.labelNl ? option.labelNl : option.label;
+  const optionHelperText =
+    language === "nl" && option.helperTextNl ? option.helperTextNl : option.helperText;
+
+  const getChoiceLabel = (choice: CustomizationOption["choices"][number]) =>
+    language === "nl" && choice.labelNl ? choice.labelNl : choice.label;
+
   return (
     <fieldset className="space-y-3">
       <legend className="text-sm font-semibold text-[var(--color-ink)]">
-        {option.label}
+        {optionLabel}
       </legend>
 
-      {option.helperText ? (
-        <p className="text-xs text-[var(--color-muted)]">{option.helperText}</p>
+      {optionHelperText ? (
+        <p className="text-xs text-[var(--color-muted)]">{optionHelperText}</p>
       ) : null}
 
       {option.type === "dropdown" ? (
         <label className="sr-only" htmlFor={option.id}>
-          {option.label}
+          {optionLabel}
         </label>
       ) : null}
 
@@ -39,7 +48,7 @@ export const OptionSelector = ({
         >
           {option.choices.map((choice) => (
             <option key={choice.id} value={choice.id}>
-              {choice.label}
+              {getChoiceLabel(choice)}
               {choice.priceModifier !== 0
                 ? ` (${choice.priceModifier > 0 ? "+" : ""}${choice.priceModifier})`
                 : ""}
@@ -62,7 +71,7 @@ export const OptionSelector = ({
                   : "border-black/10 bg-white text-[var(--color-ink)] hover:border-[var(--color-wood)]",
               )}
             >
-              {choice.label}
+              {getChoiceLabel(choice)}
             </button>
           ))}
         </div>
@@ -81,13 +90,13 @@ export const OptionSelector = ({
                   ? "border-[var(--color-wood-dark)] bg-[var(--color-neutral-100)]"
                   : "border-black/10 bg-white hover:border-[var(--color-wood)]",
               )}
-              aria-label={`${option.label}: ${choice.label}`}
+              aria-label={`${optionLabel}: ${getChoiceLabel(choice)}`}
             >
               <span
                 className="h-4 w-4 rounded-full border border-black/10"
                 style={{ backgroundColor: choice.swatchHex || "#d8d8d8" }}
               />
-              {choice.label}
+              {getChoiceLabel(choice)}
             </button>
           ))}
         </div>

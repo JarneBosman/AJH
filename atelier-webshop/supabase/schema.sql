@@ -4,14 +4,19 @@ create table if not exists public.products (
   id uuid primary key default gen_random_uuid(),
   slug text not null unique,
   name text not null,
+  name_nl text,
   subtitle text not null,
+  subtitle_nl text,
   description text not null,
+  description_nl text,
   category text not null,
   base_price numeric(10, 2) not null,
   lead_time text not null,
+  lead_time_nl text,
   images jsonb not null default '[]'::jsonb,
   featured boolean not null default false,
   story text,
+  story_nl text,
   default_selections jsonb not null default '{}'::jsonb,
   custom_options jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
@@ -29,17 +34,40 @@ alter table public.products
   add column if not exists custom_options jsonb not null default '[]'::jsonb;
 
 alter table public.products
+  add column if not exists name_nl text;
+
+alter table public.products
+  add column if not exists subtitle_nl text;
+
+alter table public.products
+  add column if not exists description_nl text;
+
+alter table public.products
+  add column if not exists lead_time_nl text;
+
+alter table public.products
+  add column if not exists story_nl text;
+
+alter table public.products
   drop constraint if exists products_category_check;
 
 create table if not exists public.categories (
   id uuid primary key default gen_random_uuid(),
   slug text not null unique,
   name text not null,
+  name_nl text,
   description text not null default '',
+  description_nl text,
   hero_image text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.categories
+  add column if not exists name_nl text;
+
+alter table public.categories
+  add column if not exists description_nl text;
 
 create table if not exists public.admin_users (
   user_id uuid primary key references auth.users(id) on delete cascade,

@@ -6,8 +6,10 @@ import { Providers } from "@/components/providers";
 import { useCart } from "@/context/cart-context";
 import { formatCurrency, startCase } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/context/i18n-context";
 
 const CartContent = () => {
+  const { t } = useI18n();
   const { items, subtotal, updateQuantity, removeItem, clearCart } = useCart();
   const shipping = items.length > 0 ? 45 : 0;
   const total = subtotal + shipping;
@@ -16,20 +18,20 @@ const CartContent = () => {
     return (
       <section className="mx-auto w-full max-w-5xl px-6 pb-20 pt-16 text-center md:px-10">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-wood)]">
-          Cart
+          {t.cartEyebrow}
         </p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-[var(--color-ink)]">
-          Your cart is empty
+          {t.cartEmptyTitle}
         </h1>
         <p className="mt-3 text-[var(--color-muted)]">
-          Add a handcrafted item from the shop or build one in the configurator.
+          {t.cartEmptyDescription}
         </p>
         <div className="mt-8 flex justify-center gap-3">
           <Link href="/shop">
-            <Button>Shop collection</Button>
+            <Button>{t.cartShopCta}</Button>
           </Link>
           <Link href="/configurator">
-            <Button variant="secondary">Open configurator</Button>
+            <Button variant="secondary">{t.cartConfigCta}</Button>
           </Link>
         </div>
       </section>
@@ -42,14 +44,14 @@ const CartContent = () => {
         <div className="mb-6 flex items-end justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-wood)]">
-              Cart
+              {t.cartEyebrow}
             </p>
             <h1 className="mt-2 text-4xl font-semibold tracking-tight text-[var(--color-ink)]">
-              Review your items
+              {t.cartReviewTitle}
             </h1>
           </div>
           <Button variant="ghost" onClick={clearCart}>
-            Clear cart
+            {t.cartClear}
           </Button>
         </div>
 
@@ -95,7 +97,7 @@ const CartContent = () => {
                   ))}
                   {item.dimensions ? (
                     <li className="flex justify-between gap-2">
-                      <span>Dimensions</span>
+                      <span>{t.cartDimensions}</span>
                       <span className="font-medium text-[var(--color-ink)]">
                         {item.dimensions.width} x {item.dimensions.depth} x {item.dimensions.height} cm
                       </span>
@@ -106,7 +108,7 @@ const CartContent = () => {
                 {item.comment ? (
                   <div className="rounded-2xl border border-[var(--color-wood)]/20 bg-[var(--color-wood)]/5 p-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-wood)]">
-                      Your note
+                      {t.cartYourNote}
                     </p>
                     <p className="mt-1 text-sm text-[var(--color-ink)]">{item.comment}</p>
                   </div>
@@ -137,7 +139,7 @@ const CartContent = () => {
                     onClick={() => removeItem(item.id)}
                     className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)] hover:text-[var(--color-ink)]"
                   >
-                    Remove
+                    {t.cartRemove}
                   </button>
                 </div>
               </div>
@@ -147,26 +149,25 @@ const CartContent = () => {
       </div>
 
       <aside className="h-fit rounded-3xl border border-black/5 bg-white p-6">
-        <h2 className="text-xl font-semibold text-[var(--color-ink)]">Checkout summary</h2>
+        <h2 className="text-xl font-semibold text-[var(--color-ink)]">{t.cartCheckoutSummary}</h2>
         <div className="mt-5 space-y-3 text-sm">
           <p className="flex justify-between text-[var(--color-muted)]">
-            <span>Subtotal</span>
+            <span>{t.cartSubtotal}</span>
             <span className="text-[var(--color-ink)]">{formatCurrency(subtotal)}</span>
           </p>
           <p className="flex justify-between text-[var(--color-muted)]">
-            <span>Shipping (mocked)</span>
+            <span>{t.cartShipping}</span>
             <span className="text-[var(--color-ink)]">{formatCurrency(shipping)}</span>
           </p>
           <p className="flex justify-between border-t border-black/5 pt-3 text-base font-semibold text-[var(--color-ink)]">
-            <span>Total</span>
+            <span>{t.cartTotal}</span>
             <span>{formatCurrency(total)}</span>
           </p>
         </div>
 
-        <Button className="mt-6 w-full">Proceed to checkout</Button>
+        <Button className="mt-6 w-full">{t.cartCheckoutCta}</Button>
         <p className="mt-3 text-xs text-[var(--color-muted)]">
-          Checkout flow is intentionally basic and ready to be connected to a real
-          payment/backend service.
+          {t.cartCheckoutHint}
         </p>
       </aside>
     </section>

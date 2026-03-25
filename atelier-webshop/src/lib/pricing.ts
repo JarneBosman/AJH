@@ -4,6 +4,7 @@ import {
   DimensionSelection,
   ResolvedSelection,
 } from "@/types/shop";
+import { Language } from "@/lib/i18n";
 
 interface ConfiguratorPriceInput {
   basePrice: number;
@@ -29,7 +30,11 @@ const findChoice = (
 export const resolveSelections = (
   options: CustomizationOption[],
   selectedMap: Record<string, string>,
+  language: Language = "en",
 ): ResolvedSelection[] => {
+  const localize = (english: string, dutch?: string) =>
+    language === "nl" && dutch ? dutch : english;
+
   // Ensure every option has a valid choice by falling back to the first available choice.
   return options.reduce<ResolvedSelection[]>((accumulator, option) => {
       const desiredChoiceId = selectedMap[option.id] ?? option.choices[0]?.id;
@@ -43,9 +48,9 @@ export const resolveSelections = (
 
       accumulator.push({
         optionId: option.id,
-        optionLabel: option.label,
+        optionLabel: localize(option.label, option.labelNl),
         choiceId: match.choice.id,
-        choiceLabel: match.choice.label,
+        choiceLabel: localize(match.choice.label, match.choice.labelNl),
         priceModifier: match.choice.priceModifier,
         swatchHex: match.choice.swatchHex,
       });
@@ -61,8 +66,9 @@ export const calculateProductPrice = (
   basePrice: number,
   options: CustomizationOption[],
   selectedMap: Record<string, string>,
+  language: Language = "en",
 ) => {
-  const selections = resolveSelections(options, selectedMap);
+  const selections = resolveSelections(options, selectedMap, language);
   const dynamicPrice = basePrice + calculateSelectionsDelta(selections);
 
   return {

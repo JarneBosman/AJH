@@ -6,14 +6,18 @@ import { hasSupabaseConfig } from "@/lib/supabase/config";
 interface CategoryRow {
   slug: string;
   name: string;
+  name_nl: string | null;
   description: string;
+  description_nl: string | null;
   hero_image: string;
 }
 
 const mapRowToCategory = (row: CategoryRow): ProductCategory => ({
   slug: row.slug,
   name: row.name,
+  ...(row.name_nl ? { nameNl: row.name_nl } : {}),
   description: row.description,
+  ...(row.description_nl ? { descriptionNl: row.description_nl } : {}),
   heroImage: row.hero_image,
 });
 
@@ -30,7 +34,7 @@ const getSupabaseCategories = async (): Promise<ProductCategory[] | null> => {
 
   const { data, error } = await supabase
     .from("categories")
-    .select("slug, name, description, hero_image")
+    .select("slug, name, name_nl, description, description_nl, hero_image")
     .order("created_at", { ascending: true });
 
   if (error || !data) {
