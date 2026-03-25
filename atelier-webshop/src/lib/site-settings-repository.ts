@@ -5,6 +5,7 @@ export type LayoutMode = "compact" | "balanced" | "spacious";
 export type ContainerWidthMode = "narrow" | "standard" | "wide";
 export type SectionSpacingMode = "tight" | "balanced" | "airy";
 export type HeroLayoutMode = "split" | "centered" | "image-first";
+export type FontPreset = "manrope" | "jakarta" | "system" | "serif";
 
 export interface SiteSettings {
   brandName: string;
@@ -20,6 +21,9 @@ export interface SiteSettings {
   containerWidth: ContainerWidthMode;
   sectionSpacing: SectionSpacingMode;
   heroLayout: HeroLayoutMode;
+  fontBody: FontPreset;
+  fontHeading: FontPreset;
+  buttonRadius: string;
 }
 
 const fallbackSiteSettings: SiteSettings = {
@@ -36,6 +40,9 @@ const fallbackSiteSettings: SiteSettings = {
   containerWidth: "standard",
   sectionSpacing: "balanced",
   heroLayout: "split",
+  fontBody: "manrope",
+  fontHeading: "jakarta",
+  buttonRadius: "9999px",
 };
 
 interface SiteSettingsRow {
@@ -52,6 +59,9 @@ interface SiteSettingsRow {
   container_width: ContainerWidthMode;
   section_spacing: SectionSpacingMode;
   hero_layout: HeroLayoutMode;
+  font_body?: FontPreset;
+  font_heading?: FontPreset;
+  button_radius?: string;
 }
 
 const mapRowToSettings = (row: SiteSettingsRow): SiteSettings => ({
@@ -68,6 +78,9 @@ const mapRowToSettings = (row: SiteSettingsRow): SiteSettings => ({
   containerWidth: row.container_width,
   sectionSpacing: row.section_spacing,
   heroLayout: row.hero_layout,
+  fontBody: row.font_body ?? "manrope",
+  fontHeading: row.font_heading ?? "jakarta",
+  buttonRadius: row.button_radius ?? "9999px",
 });
 
 export const getSiteSettingsFromStore = async (): Promise<SiteSettings> => {
@@ -83,9 +96,7 @@ export const getSiteSettingsFromStore = async (): Promise<SiteSettings> => {
 
   const { data, error } = await supabase
     .from("site_settings")
-    .select(
-      "brand_name, color_bg, color_ink, color_muted, color_neutral_100, color_neutral_200, color_neutral_300, color_wood, color_wood_dark, layout_mode, container_width, section_spacing, hero_layout",
-    )
+    .select("*")
     .eq("id", 1)
     .maybeSingle();
 

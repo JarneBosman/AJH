@@ -44,6 +44,9 @@ export default async function ShopPage() {
         eyebrow={cmsPage?.eyebrow || t.shopEyebrow}
         title={cmsPage?.title || t.shopTitle}
         description={cmsPage?.description || t.shopDescription}
+        eyebrowEditableId="shop.eyebrow"
+        titleEditableId="shop.title"
+        descriptionEditableId="shop.description"
       />
 
       <div className="mt-7 flex flex-wrap gap-2">

@@ -46,23 +46,45 @@ export default async function Home() {
     <div className="pb-20">
       <section
         data-home-hero
+        data-cms-editable="home.heroSection"
+        data-cms-edit-types="shape,location,background"
         className="mx-auto grid w-full max-w-7xl gap-8 px-6 pb-8 pt-14 md:grid-cols-[1fr_1.1fr] md:px-10 md:pt-20"
       >
         <div data-home-hero-copy className="animate-rise max-w-xl space-y-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-wood)]">
+          <p
+            data-cms-editable="home.heroEyebrow"
+            data-cms-edit-types="text,color,location"
+            className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-wood)]"
+          >
             {cmsHome?.heroEyebrow || t.homeHeroEyebrow}
           </p>
-          <h1 className="text-balance text-5xl font-semibold leading-tight tracking-tight text-[var(--color-ink)] md:text-6xl">
+          <h1
+            data-cms-editable="home.heroTitle"
+            data-cms-edit-types="text,color,location"
+            className="text-balance text-5xl font-semibold leading-tight tracking-tight text-[var(--color-ink)] md:text-6xl"
+          >
             {cmsHome?.heroTitle || t.homeHeroTitle}
           </h1>
-          <p className="text-pretty text-base leading-8 text-[var(--color-muted)] md:text-lg">
+          <p
+            data-cms-editable="home.heroDescription"
+            data-cms-edit-types="text,color,location"
+            className="text-pretty text-base leading-8 text-[var(--color-muted)] md:text-lg"
+          >
             {cmsHome?.heroDescription || t.homeHeroDescription}
           </p>
           <div data-home-hero-actions className="flex flex-wrap gap-3">
-            <Link href="/shop">
+            <Link
+              href="/shop"
+              data-cms-editable="home.heroPrimaryCta"
+              data-cms-edit-types="text,color,shape,location,background"
+            >
               <Button>{cmsHome?.heroPrimaryCta || t.homeHeroPrimaryCta}</Button>
             </Link>
-            <Link href="/configurator">
+            <Link
+              href="/configurator"
+              data-cms-editable="home.heroSecondaryCta"
+              data-cms-edit-types="text,color,shape,location,background"
+            >
               <Button variant="secondary">{cmsHome?.heroSecondaryCta || t.homeHeroSecondaryCta}</Button>
             </Link>
           </div>
@@ -70,6 +92,9 @@ export default async function Home() {
 
         <div
           data-home-hero-media
+          data-cms-editable="home.heroMedia"
+          data-cms-edit-types="image,shape,location,background"
+          data-cms-image-target="img"
           className="relative overflow-hidden rounded-[2.2rem] border border-black/5 bg-white p-2 shadow-[0_30px_70px_-45px_rgba(0,0,0,0.5)]"
         >
           <div className="relative aspect-[4/3] overflow-hidden rounded-[1.8rem]">
@@ -93,6 +118,9 @@ export default async function Home() {
           eyebrow={cmsHome?.featuredEyebrow || t.homeFeaturedEyebrow}
           title={cmsHome?.featuredTitle || t.homeFeaturedTitle}
           description={cmsHome?.featuredDescription || t.homeFeaturedDescription}
+          eyebrowEditableId="home.featuredEyebrow"
+          titleEditableId="home.featuredTitle"
+          descriptionEditableId="home.featuredDescription"
         />
 
         <div className="mt-8 grid gap-6 md:grid-cols-3">
@@ -107,6 +135,9 @@ export default async function Home() {
           eyebrow={cmsHome?.categoriesEyebrow || t.homeCategoriesEyebrow}
           title={cmsHome?.categoriesTitle || t.homeCategoriesTitle}
           description={cmsHome?.categoriesDescription || t.homeCategoriesDescription}
+          eyebrowEditableId="home.categoriesEyebrow"
+          titleEditableId="home.categoriesTitle"
+          descriptionEditableId="home.categoriesDescription"
         />
 
         <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -139,16 +170,29 @@ export default async function Home() {
       </section>
 
       <section className="mx-auto mt-20 w-full max-w-7xl px-6 md:px-10">
-        <div className="rounded-[2rem] border border-black/5 bg-white p-8 md:p-12">
+        <div
+          data-cms-editable="home.storyCard"
+          data-cms-edit-types="shape,location,background"
+          className="rounded-[2rem] border border-black/5 bg-white p-8 md:p-12"
+        >
           <SectionHeading
             eyebrow={cmsHome?.storyEyebrow || t.homeStoryEyebrow}
             title={cmsHome?.storyTitle || t.homeStoryTitle}
             description={cmsHome?.storyDescription || t.homeStoryDescription}
+            eyebrowEditableId="home.storyEyebrow"
+            titleEditableId="home.storyTitle"
+            descriptionEditableId="home.storyDescription"
           />
           <div className="mt-8 grid gap-4 text-sm text-[var(--color-muted)] md:grid-cols-3">
-            <p>{cmsHome?.storyPointOne || t.homeStoryPointOne}</p>
-            <p>{cmsHome?.storyPointTwo || t.homeStoryPointTwo}</p>
-            <p>{cmsHome?.storyPointThree || t.homeStoryPointThree}</p>
+            <p data-cms-editable="home.storyPointOne" data-cms-edit-types="text,color,location">
+              {cmsHome?.storyPointOne || t.homeStoryPointOne}
+            </p>
+            <p data-cms-editable="home.storyPointTwo" data-cms-edit-types="text,color,location">
+              {cmsHome?.storyPointTwo || t.homeStoryPointTwo}
+            </p>
+            <p data-cms-editable="home.storyPointThree" data-cms-edit-types="text,color,location">
+              {cmsHome?.storyPointThree || t.homeStoryPointThree}
+            </p>
           </div>
         </div>
       </section>

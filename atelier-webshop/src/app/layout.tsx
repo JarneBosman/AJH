@@ -57,6 +57,23 @@ export default async function RootLayout({
             "--color-neutral-300": siteSettings.colorNeutral300,
             "--color-wood": siteSettings.colorWood,
             "--color-wood-dark": siteSettings.colorWoodDark,
+            "--font-body":
+              siteSettings.fontBody === "jakarta"
+                ? "var(--font-jakarta), sans-serif"
+                : siteSettings.fontBody === "system"
+                  ? "ui-sans-serif, system-ui, sans-serif"
+                  : siteSettings.fontBody === "serif"
+                    ? "Georgia, Times New Roman, serif"
+                    : "var(--font-manrope), sans-serif",
+            "--font-heading":
+              siteSettings.fontHeading === "manrope"
+                ? "var(--font-manrope), sans-serif"
+                : siteSettings.fontHeading === "system"
+                  ? "ui-sans-serif, system-ui, sans-serif"
+                  : siteSettings.fontHeading === "serif"
+                    ? "Georgia, Times New Roman, serif"
+                    : "var(--font-jakarta), sans-serif",
+            "--button-radius": siteSettings.buttonRadius,
           } as React.CSSProperties
         }
       >

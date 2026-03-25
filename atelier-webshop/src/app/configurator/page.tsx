@@ -34,12 +34,22 @@ export default async function ConfiguratorPage() {
     <section className="mx-auto w-full max-w-7xl px-6 pb-20 pt-12 md:px-10">
       <div className="mx-auto mb-8 max-w-3xl text-center">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-wood)]">
+          <span data-cms-editable="configurator.eyebrow" data-cms-edit-types="text,color,location">
           {cmsPage?.eyebrow || t.configEyebrow}
+          </span>
         </p>
-        <h1 className="mt-3 text-balance text-4xl font-semibold tracking-tight text-[var(--color-ink)] md:text-5xl">
+        <h1
+          data-cms-editable="configurator.title"
+          data-cms-edit-types="text,color,location"
+          className="mt-3 text-balance text-4xl font-semibold tracking-tight text-[var(--color-ink)] md:text-5xl"
+        >
           {cmsPage?.title || t.configTitle}
         </h1>
-        <p className="mt-4 text-pretty text-base leading-8 text-[var(--color-muted)] md:text-lg">
+        <p
+          data-cms-editable="configurator.description"
+          data-cms-edit-types="text,color,location"
+          className="mt-4 text-pretty text-base leading-8 text-[var(--color-muted)] md:text-lg"
+        >
           {cmsPage?.description || t.configDescription}
         </p>
       </div>

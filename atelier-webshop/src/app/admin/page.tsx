@@ -53,6 +53,7 @@ type LayoutMode = "compact" | "balanced" | "spacious";
 type ContainerWidthMode = "narrow" | "standard" | "wide";
 type SectionSpacingMode = "tight" | "balanced" | "airy";
 type HeroLayoutMode = "split" | "centered" | "image-first";
+type FontPreset = "manrope" | "jakarta" | "system" | "serif";
 
 interface AppearanceSettingsState {
   brandName: string;
@@ -68,6 +69,9 @@ interface AppearanceSettingsState {
   containerWidth: ContainerWidthMode;
   sectionSpacing: SectionSpacingMode;
   heroLayout: HeroLayoutMode;
+  fontBody: FontPreset;
+  fontHeading: FontPreset;
+  buttonRadius: string;
 }
 
 interface AppearanceScheme {
@@ -130,6 +134,24 @@ interface CmsLinkRowState {
 
 type CmsPageSlug = "home" | "shop" | "configurator" | "cart";
 
+type CmsDraftSection = "home" | Exclude<CmsPageSlug, "home">;
+
+interface CmsEditableBinding {
+  id: string;
+  route: string;
+  label: string;
+  section: CmsDraftSection;
+  keyEn: string;
+  keyNl?: string;
+  kind: "text" | "image";
+}
+
+interface CmsNavigationBinding {
+  location: "header" | "footer";
+  index: number;
+  label: string;
+}
+
 interface CmsGenericDraftState {
   eyebrow: string;
   eyebrowNl: string;
@@ -152,6 +174,44 @@ interface CmsMediaAssetRow {
   alt: string | null;
   alt_nl: string | null;
   created_at: string;
+}
+
+interface PreviewEditableCapabilities {
+  text: boolean;
+  color: boolean;
+  background: boolean;
+  shape: boolean;
+  image: boolean;
+  location: boolean;
+}
+
+interface PreviewEditableValues {
+  text: string;
+  color: string;
+  fontFamily: string;
+  fontSize: string;
+  fontWeight: string;
+  backgroundColor: string;
+  borderRadius: string;
+  imageUrl: string;
+  x: number;
+  y: number;
+}
+
+interface PreviewEditHistoryEntry {
+  id: string;
+  before: PreviewEditableValues;
+  after: PreviewEditableValues;
+}
+
+interface FullscreenInspectorPosition {
+  left: number;
+  top: number;
+}
+
+interface FullscreenInspectorSize {
+  width: number;
+  height: number;
 }
 
 interface NewProductState {
@@ -195,6 +255,9 @@ const createInitialAppearanceState = (): AppearanceSettingsState => ({
   containerWidth: "standard",
   sectionSpacing: "balanced",
   heroLayout: "split",
+  fontBody: "manrope",
+  fontHeading: "jakarta",
+  buttonRadius: "9999px",
 });
 
 const createInitialCmsSeoState = (): CmsSeoState => ({
@@ -254,6 +317,19 @@ const createInitialCmsGenericDraftState = (): CmsGenericDraftState => ({
   secondaryCtaNl: "",
 });
 
+const createInitialPreviewEditableValues = (): PreviewEditableValues => ({
+  text: "",
+  color: "",
+  fontFamily: "",
+  fontSize: "",
+  fontWeight: "",
+  backgroundColor: "",
+  borderRadius: "",
+  imageUrl: "",
+  x: 0,
+  y: 0,
+});
+
 interface DefaultSelectionRow {
   id: string;
   optionId: string;
@@ -285,6 +361,7 @@ const standardOptionStorageKey = "atelier.admin.defaultSelectionStandardOptionId
 const appearanceSchemesStorageKey = "atelier.admin.appearanceSchemes";
 const productImageBucket = "product-images";
 const appearanceUndoHistoryLimit = 30;
+const previewEditHistoryLimit = 200;
 const cmsHomeSlug = "home";
 const cmsMediaBucket = "cms-media";
 const cmsManagedPageSlugs: CmsPageSlug[] = ["home", "shop", "configurator", "cart"];
@@ -292,6 +369,38 @@ const cmsAdditionalPageSlugs: Array<Exclude<CmsPageSlug, "home">> = [
   "shop",
   "configurator",
   "cart",
+];
+
+const cmsEditableBindings: CmsEditableBinding[] = [
+  { id: "home.heroEyebrow", route: "/", label: "Home Hero Eyebrow", section: "home", keyEn: "heroEyebrow", keyNl: "heroEyebrowNl", kind: "text" },
+  { id: "home.heroTitle", route: "/", label: "Home Hero Title", section: "home", keyEn: "heroTitle", keyNl: "heroTitleNl", kind: "text" },
+  { id: "home.heroDescription", route: "/", label: "Home Hero Description", section: "home", keyEn: "heroDescription", keyNl: "heroDescriptionNl", kind: "text" },
+  { id: "home.heroPrimaryCta", route: "/", label: "Home Hero Primary CTA", section: "home", keyEn: "heroPrimaryCta", keyNl: "heroPrimaryCtaNl", kind: "text" },
+  { id: "home.heroSecondaryCta", route: "/", label: "Home Hero Secondary CTA", section: "home", keyEn: "heroSecondaryCta", keyNl: "heroSecondaryCtaNl", kind: "text" },
+  { id: "home.heroMedia", route: "/", label: "Home Hero Image", section: "home", keyEn: "heroImage", kind: "image" },
+  { id: "home.featuredEyebrow", route: "/", label: "Home Featured Eyebrow", section: "home", keyEn: "featuredEyebrow", keyNl: "featuredEyebrowNl", kind: "text" },
+  { id: "home.featuredTitle", route: "/", label: "Home Featured Title", section: "home", keyEn: "featuredTitle", keyNl: "featuredTitleNl", kind: "text" },
+  { id: "home.featuredDescription", route: "/", label: "Home Featured Description", section: "home", keyEn: "featuredDescription", keyNl: "featuredDescriptionNl", kind: "text" },
+  { id: "home.categoriesEyebrow", route: "/", label: "Home Categories Eyebrow", section: "home", keyEn: "categoriesEyebrow", keyNl: "categoriesEyebrowNl", kind: "text" },
+  { id: "home.categoriesTitle", route: "/", label: "Home Categories Title", section: "home", keyEn: "categoriesTitle", keyNl: "categoriesTitleNl", kind: "text" },
+  { id: "home.categoriesDescription", route: "/", label: "Home Categories Description", section: "home", keyEn: "categoriesDescription", keyNl: "categoriesDescriptionNl", kind: "text" },
+  { id: "home.storyEyebrow", route: "/", label: "Home Story Eyebrow", section: "home", keyEn: "storyEyebrow", keyNl: "storyEyebrowNl", kind: "text" },
+  { id: "home.storyTitle", route: "/", label: "Home Story Title", section: "home", keyEn: "storyTitle", keyNl: "storyTitleNl", kind: "text" },
+  { id: "home.storyDescription", route: "/", label: "Home Story Description", section: "home", keyEn: "storyDescription", keyNl: "storyDescriptionNl", kind: "text" },
+  { id: "home.storyPointOne", route: "/", label: "Home Story Point One", section: "home", keyEn: "storyPointOne", keyNl: "storyPointOneNl", kind: "text" },
+  { id: "home.storyPointTwo", route: "/", label: "Home Story Point Two", section: "home", keyEn: "storyPointTwo", keyNl: "storyPointTwoNl", kind: "text" },
+  { id: "home.storyPointThree", route: "/", label: "Home Story Point Three", section: "home", keyEn: "storyPointThree", keyNl: "storyPointThreeNl", kind: "text" },
+  { id: "shop.eyebrow", route: "/shop", label: "Shop Eyebrow", section: "shop", keyEn: "eyebrow", keyNl: "eyebrowNl", kind: "text" },
+  { id: "shop.title", route: "/shop", label: "Shop Title", section: "shop", keyEn: "title", keyNl: "titleNl", kind: "text" },
+  { id: "shop.description", route: "/shop", label: "Shop Description", section: "shop", keyEn: "description", keyNl: "descriptionNl", kind: "text" },
+  { id: "configurator.eyebrow", route: "/configurator", label: "Configurator Eyebrow", section: "configurator", keyEn: "eyebrow", keyNl: "eyebrowNl", kind: "text" },
+  { id: "configurator.title", route: "/configurator", label: "Configurator Title", section: "configurator", keyEn: "title", keyNl: "titleNl", kind: "text" },
+  { id: "configurator.description", route: "/configurator", label: "Configurator Description", section: "configurator", keyEn: "description", keyNl: "descriptionNl", kind: "text" },
+  { id: "cart.eyebrow", route: "/cart", label: "Cart Eyebrow", section: "cart", keyEn: "eyebrow", keyNl: "eyebrowNl", kind: "text" },
+  { id: "cart.title", route: "/cart", label: "Cart Title", section: "cart", keyEn: "title", keyNl: "titleNl", kind: "text" },
+  { id: "cart.description", route: "/cart", label: "Cart Description", section: "cart", keyEn: "description", keyNl: "descriptionNl", kind: "text" },
+  { id: "cart.primaryCta", route: "/cart", label: "Cart Primary CTA", section: "cart", keyEn: "primaryCta", keyNl: "primaryCtaNl", kind: "text" },
+  { id: "cart.secondaryCta", route: "/cart", label: "Cart Secondary CTA", section: "cart", keyEn: "secondaryCta", keyNl: "secondaryCtaNl", kind: "text" },
 ];
 
 const createCmsLinkRow = (): CmsLinkRowState => ({
@@ -303,6 +412,19 @@ const createCmsLinkRow = (): CmsLinkRowState => ({
 });
 
 const asText = (value: unknown) => (typeof value === "string" ? value : "");
+
+const parseNavigationEditableId = (id: string): CmsNavigationBinding | null => {
+  const match = id.match(/^nav\.(header|footer)\.(\d+)\.label$/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    location: match[1] as "header" | "footer",
+    index: Number(match[2]),
+    label: `${match[1] === "header" ? "Header" : "Footer"} Link ${Number(match[2]) + 1}`,
+  };
+};
 
 const parseCmsHomeDraft = (value: unknown): CmsHomeDraftState => {
   const defaults = createInitialCmsHomeDraftState();
@@ -539,6 +661,21 @@ export default function AdminPage() {
   const [newAppearanceSchemeName, setNewAppearanceSchemeName] = useState("");
   const [appearanceDrawerOpen, setAppearanceDrawerOpen] = useState(false);
   const [previewPath, setPreviewPath] = useState("/");
+  const [previewFullscreen, setPreviewFullscreen] = useState(false);
+  const [previewFullscreenInspectorOpen, setPreviewFullscreenInspectorOpen] = useState(true);
+  const [previewFullscreenInspectorPosition, setPreviewFullscreenInspectorPosition] =
+    useState<FullscreenInspectorPosition>({ left: 24, top: 72 });
+  const [previewFullscreenInspectorSize, setPreviewFullscreenInspectorSize] =
+    useState<FullscreenInspectorSize>({ width: 420, height: 560 });
+  const [visualEditorEnabled, setVisualEditorEnabled] = useState(false);
+  const [selectedPreviewEditableId, setSelectedPreviewEditableId] = useState("");
+  const [selectedPreviewCapabilities, setSelectedPreviewCapabilities] =
+    useState<PreviewEditableCapabilities | null>(null);
+  const [previewEditableValues, setPreviewEditableValues] = useState<PreviewEditableValues>(
+    createInitialPreviewEditableValues,
+  );
+  const [previewUndoHistory, setPreviewUndoHistory] = useState<PreviewEditHistoryEntry[]>([]);
+  const [previewRedoHistory, setPreviewRedoHistory] = useState<PreviewEditHistoryEntry[]>([]);
   const [appearanceError, setAppearanceError] = useState("");
   const [appearanceSuccess, setAppearanceSuccess] = useState("");
   const [loadingCms, setLoadingCms] = useState(false);
@@ -577,7 +714,41 @@ export default function AdminPage() {
   const [cmsMediaAssets, setCmsMediaAssets] = useState<CmsMediaAssetRow[]>([]);
   const [cmsMediaUploadError, setCmsMediaUploadError] = useState("");
   const [isUploadingCmsMedia, setIsUploadingCmsMedia] = useState(false);
+  const [isQuickImageUploading, setIsQuickImageUploading] = useState(false);
   const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const previewCommittedValuesRef = useRef<Map<string, PreviewEditableValues>>(new Map());
+  const previewMoveHistoryDraftRef = useRef<
+    | {
+        id: string;
+        before: PreviewEditableValues;
+        latestX: number;
+        latestY: number;
+      }
+    | null
+  >(null);
+  const previewMoveHistoryTimerRef = useRef<number | null>(null);
+  const fullscreenInspectorDragRef = useRef<
+    | {
+        startClientX: number;
+        startClientY: number;
+        startLeft: number;
+        startTop: number;
+        width: number;
+        height: number;
+      }
+    | null
+  >(null);
+  const fullscreenInspectorResizeRef = useRef<
+    | {
+        startClientX: number;
+        startClientY: number;
+        startWidth: number;
+        startHeight: number;
+        left: number;
+        top: number;
+      }
+    | null
+  >(null);
   const [categoryRows, setCategoryRows] = useState<CategoryRow[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [managingCategories, setManagingCategories] = useState(false);
@@ -605,6 +776,96 @@ export default function AdminPage() {
   const [ownerCheckError, setOwnerCheckError] = useState("");
   const [slugEdited, setSlugEdited] = useState(false);
   const router = useRouter();
+  const cmsEditableBindingMap = useMemo(
+    () => new Map(cmsEditableBindings.map((binding) => [binding.id, binding])),
+    [],
+  );
+
+  const selectedCmsBinding = useMemo(
+    () => cmsEditableBindingMap.get(selectedPreviewEditableId) ?? null,
+    [cmsEditableBindingMap, selectedPreviewEditableId],
+  );
+
+  const selectedNavigationBinding = useMemo(
+    () => parseNavigationEditableId(selectedPreviewEditableId),
+    [selectedPreviewEditableId],
+  );
+
+  const selectedNavigationRow = useMemo(() => {
+    if (!selectedNavigationBinding) {
+      return null;
+    }
+
+    const source = selectedNavigationBinding.location === "header" ? cmsHeaderLinks : cmsFooterLinks;
+    return source[selectedNavigationBinding.index] ?? null;
+  }, [cmsFooterLinks, cmsHeaderLinks, selectedNavigationBinding]);
+
+  const getCmsBindingValue = useCallback(
+    (binding: CmsEditableBinding, key: "keyEn" | "keyNl") => {
+      const fieldName = binding[key];
+      if (!fieldName) {
+        return "";
+      }
+
+      if (binding.section === "home") {
+        return cmsHomeDraft[fieldName as keyof CmsHomeDraftState] as string;
+      }
+
+      const pageSection = binding.section as Exclude<CmsPageSlug, "home">;
+      return cmsPageDrafts[pageSection][fieldName as keyof CmsGenericDraftState] as string;
+    },
+    [cmsHomeDraft, cmsPageDrafts],
+  );
+
+  const setCmsBindingValue = useCallback(
+    (binding: CmsEditableBinding, key: "keyEn" | "keyNl", value: string) => {
+      const fieldName = binding[key];
+      if (!fieldName) {
+        return;
+      }
+
+      if (binding.section === "home") {
+        setCmsHomeDraft((previous) => ({
+          ...previous,
+          [fieldName]: value,
+        }));
+        return;
+      }
+
+      const pageSection = binding.section as Exclude<CmsPageSlug, "home">;
+
+      setCmsPageDrafts((previous) => ({
+        ...previous,
+        [pageSection]: {
+          ...previous[pageSection],
+          [fieldName]: value,
+        },
+      }));
+    },
+    [],
+  );
+
+  const updateSelectedNavigationRow = useCallback(
+    (field: keyof Omit<CmsLinkRowState, "id">, value: string | boolean) => {
+      if (!selectedNavigationBinding) {
+        return;
+      }
+
+      const setter = selectedNavigationBinding.location === "header" ? setCmsHeaderLinks : setCmsFooterLinks;
+
+      setter((previous) =>
+        previous.map((row, index) =>
+          index === selectedNavigationBinding.index ? { ...row, [field]: value } : row,
+        ),
+      );
+    },
+    [selectedNavigationBinding],
+  );
+
+  const getCmsMediaPublicUrl = useCallback(
+    (asset: CmsMediaAssetRow) => supabase.storage.from(asset.bucket).getPublicUrl(asset.storage_path).data.publicUrl,
+    [supabase],
+  );
 
   useEffect(() => {
     const stored = window.localStorage.getItem(standardOptionStorageKey);
@@ -718,6 +979,26 @@ export default function AdminPage() {
             return null;
           }
 
+          const fontBody = settings.fontBody;
+          const fontHeading = settings.fontHeading;
+          const buttonRadius = settings.buttonRadius;
+
+          const normalizedFontBody: FontPreset =
+            fontBody === "manrope" ||
+            fontBody === "jakarta" ||
+            fontBody === "system" ||
+            fontBody === "serif"
+              ? fontBody
+              : "manrope";
+
+          const normalizedFontHeading: FontPreset =
+            fontHeading === "manrope" ||
+            fontHeading === "jakarta" ||
+            fontHeading === "system" ||
+            fontHeading === "serif"
+              ? fontHeading
+              : "jakarta";
+
           const requiredColorFields = [
             "brandName",
             "colorBg",
@@ -759,6 +1040,12 @@ export default function AdminPage() {
               containerWidth,
               sectionSpacing,
               heroLayout,
+              fontBody: normalizedFontBody,
+              fontHeading: normalizedFontHeading,
+              buttonRadius:
+                typeof buttonRadius === "string" && buttonRadius.trim().length > 0
+                  ? buttonRadius
+                  : "9999px",
             },
           };
         })
@@ -860,9 +1147,7 @@ export default function AdminPage() {
 
       const { data, error: queryError } = await (supabase as any)
         .from("site_settings")
-        .select(
-          "brand_name, color_bg, color_ink, color_muted, color_neutral_100, color_neutral_200, color_neutral_300, color_wood, color_wood_dark, layout_mode, container_width, section_spacing, hero_layout",
-        )
+        .select("*")
         .eq("id", 1)
         .maybeSingle();
 
@@ -875,35 +1160,43 @@ export default function AdminPage() {
         return;
       }
 
+      const settings = data as Record<string, unknown>;
+
       setAppearanceForm({
-        brandName: data.brand_name,
-        colorBg: data.color_bg,
-        colorInk: data.color_ink,
-        colorMuted: data.color_muted,
-        colorNeutral100: data.color_neutral_100,
-        colorNeutral200: data.color_neutral_200,
-        colorNeutral300: data.color_neutral_300,
-        colorWood: data.color_wood,
-        colorWoodDark: data.color_wood_dark,
-        layoutMode: (data.layout_mode ?? "balanced") as LayoutMode,
-        containerWidth: (data.container_width ?? "standard") as ContainerWidthMode,
-        sectionSpacing: (data.section_spacing ?? "balanced") as SectionSpacingMode,
-        heroLayout: (data.hero_layout ?? "split") as HeroLayoutMode,
+        brandName: String(settings.brand_name ?? "Atelier Nord"),
+        colorBg: String(settings.color_bg ?? "#fbfaf8"),
+        colorInk: String(settings.color_ink ?? "#2b231d"),
+        colorMuted: String(settings.color_muted ?? "#6f655c"),
+        colorNeutral100: String(settings.color_neutral_100 ?? "#f2ede7"),
+        colorNeutral200: String(settings.color_neutral_200 ?? "#e8e1d8"),
+        colorNeutral300: String(settings.color_neutral_300 ?? "#d7cabc"),
+        colorWood: String(settings.color_wood ?? "#b88a5b"),
+        colorWoodDark: String(settings.color_wood_dark ?? "#7f5534"),
+        layoutMode: (settings.layout_mode ?? "balanced") as LayoutMode,
+        containerWidth: (settings.container_width ?? "standard") as ContainerWidthMode,
+        sectionSpacing: (settings.section_spacing ?? "balanced") as SectionSpacingMode,
+        heroLayout: (settings.hero_layout ?? "split") as HeroLayoutMode,
+        fontBody: (settings.font_body ?? "manrope") as FontPreset,
+        fontHeading: (settings.font_heading ?? "jakarta") as FontPreset,
+        buttonRadius: String(settings.button_radius ?? "9999px"),
       });
       setAppearanceDefaultSnapshot({
-        brandName: data.brand_name,
-        colorBg: data.color_bg,
-        colorInk: data.color_ink,
-        colorMuted: data.color_muted,
-        colorNeutral100: data.color_neutral_100,
-        colorNeutral200: data.color_neutral_200,
-        colorNeutral300: data.color_neutral_300,
-        colorWood: data.color_wood,
-        colorWoodDark: data.color_wood_dark,
-        layoutMode: (data.layout_mode ?? "balanced") as LayoutMode,
-        containerWidth: (data.container_width ?? "standard") as ContainerWidthMode,
-        sectionSpacing: (data.section_spacing ?? "balanced") as SectionSpacingMode,
-        heroLayout: (data.hero_layout ?? "split") as HeroLayoutMode,
+        brandName: String(settings.brand_name ?? "Atelier Nord"),
+        colorBg: String(settings.color_bg ?? "#fbfaf8"),
+        colorInk: String(settings.color_ink ?? "#2b231d"),
+        colorMuted: String(settings.color_muted ?? "#6f655c"),
+        colorNeutral100: String(settings.color_neutral_100 ?? "#f2ede7"),
+        colorNeutral200: String(settings.color_neutral_200 ?? "#e8e1d8"),
+        colorNeutral300: String(settings.color_neutral_300 ?? "#d7cabc"),
+        colorWood: String(settings.color_wood ?? "#b88a5b"),
+        colorWoodDark: String(settings.color_wood_dark ?? "#7f5534"),
+        layoutMode: (settings.layout_mode ?? "balanced") as LayoutMode,
+        containerWidth: (settings.container_width ?? "standard") as ContainerWidthMode,
+        sectionSpacing: (settings.section_spacing ?? "balanced") as SectionSpacingMode,
+        heroLayout: (settings.hero_layout ?? "split") as HeroLayoutMode,
+        fontBody: (settings.font_body ?? "manrope") as FontPreset,
+        fontHeading: (settings.font_heading ?? "jakarta") as FontPreset,
+        buttonRadius: String(settings.button_radius ?? "9999px"),
       });
       setAppearanceDirty(false);
       setAppearanceUndoHistory([]);
@@ -921,7 +1214,7 @@ export default function AdminPage() {
         setSavingAppearance(true);
         setAppearanceError("");
 
-        const { error: upsertError } = await (supabase as any).from("site_settings").upsert({
+        const basePayload = {
           id: 1,
           brand_name: nextAppearance.brandName.trim() || "Atelier Nord",
           color_bg: nextAppearance.colorBg,
@@ -936,7 +1229,23 @@ export default function AdminPage() {
           container_width: nextAppearance.containerWidth,
           section_spacing: nextAppearance.sectionSpacing,
           hero_layout: nextAppearance.heroLayout,
-        });
+        };
+
+        const extendedPayload = {
+          ...basePayload,
+          font_body: nextAppearance.fontBody,
+          font_heading: nextAppearance.fontHeading,
+          button_radius: nextAppearance.buttonRadius,
+        };
+
+        let { error: upsertError } = await (supabase as any)
+          .from("site_settings")
+          .upsert(extendedPayload);
+
+        if (upsertError && /column .* does not exist/i.test(upsertError.message ?? "")) {
+          const retry = await (supabase as any).from("site_settings").upsert(basePayload);
+          upsertError = retry.error;
+        }
 
         if (upsertError) {
           setAppearanceError(upsertError.message);
@@ -1381,23 +1690,6 @@ export default function AdminPage() {
     setCmsFooterLinks((previous) => previous.filter((row) => row.id !== rowId));
   }, []);
 
-  const updateCmsPageField = useCallback(
-    (
-      slug: Exclude<CmsPageSlug, "home">,
-      field: keyof CmsGenericDraftState,
-      value: string,
-    ) => {
-      setCmsPageDrafts((previous) => ({
-        ...previous,
-        [slug]: {
-          ...previous[slug],
-          [field]: value,
-        },
-      }));
-    },
-    [],
-  );
-
   const updateCmsPageSeoField = useCallback(
     (slug: Exclude<CmsPageSlug, "home">, field: keyof CmsSeoState, value: string) => {
       setCmsPageSeoDrafts((previous) => ({
@@ -1546,6 +1838,307 @@ export default function AdminPage() {
     window.open(previewPath, "_blank", "noopener,noreferrer");
   };
 
+  const postPreviewEditorToggle = useCallback(() => {
+    if (!previewIframeRef.current?.contentWindow) {
+      return;
+    }
+
+    previewIframeRef.current.contentWindow.postMessage(
+      {
+        type: "cms-preview:editor:toggle",
+        payload: { enabled: visualEditorEnabled },
+      },
+      window.location.origin,
+    );
+  }, [visualEditorEnabled]);
+
+  const applyPreviewEditableChanges = useCallback(
+    (
+      changes: Partial<{
+        text: string;
+        color: string;
+        fontFamily: string;
+        fontSize: string;
+        fontWeight: string;
+        backgroundColor: string;
+        borderRadius: string;
+        imageUrl: string;
+        x: number;
+        y: number;
+      }>,
+      options?: {
+        skipHistory?: boolean;
+        targetId?: string;
+      },
+    ) => {
+      const targetId = options?.targetId ?? selectedPreviewEditableId;
+
+      if (!targetId || !previewIframeRef.current?.contentWindow) {
+        return;
+      }
+
+      const committedValues =
+        previewCommittedValuesRef.current.get(targetId) ?? previewEditableValues;
+      const beforeSnapshot: PreviewEditableValues = {
+        ...committedValues,
+      };
+      const afterSnapshot: PreviewEditableValues = {
+        ...beforeSnapshot,
+        ...changes,
+      };
+
+      if (!options?.skipHistory) {
+        if (JSON.stringify(beforeSnapshot) !== JSON.stringify(afterSnapshot)) {
+          setPreviewUndoHistory((previousHistory) => {
+            const nextHistory = [
+              ...previousHistory,
+              {
+                id: targetId,
+                before: beforeSnapshot,
+                after: afterSnapshot,
+              },
+            ];
+            return nextHistory.slice(-previewEditHistoryLimit);
+          });
+          setPreviewRedoHistory([]);
+        }
+      }
+
+      previewCommittedValuesRef.current.set(targetId, afterSnapshot);
+
+      previewIframeRef.current.contentWindow.postMessage(
+        {
+          type: "cms-preview:editor:apply",
+          payload: {
+            id: targetId,
+            changes,
+          },
+        },
+        window.location.origin,
+      );
+    },
+    [previewEditableValues, selectedPreviewEditableId],
+  );
+
+  const handleUndoPreviewChange = useCallback(() => {
+    if (previewUndoHistory.length === 0) {
+      return;
+    }
+
+    const previousEntry = previewUndoHistory[previewUndoHistory.length - 1];
+    setPreviewUndoHistory((previousHistory) => previousHistory.slice(0, -1));
+    setPreviewRedoHistory((previousHistory) => {
+      const nextHistory = [...previousHistory, previousEntry];
+      return nextHistory.slice(-previewEditHistoryLimit);
+    });
+
+    setVisualEditorEnabled(true);
+    setSelectedPreviewEditableId(previousEntry.id);
+    setPreviewEditableValues(previousEntry.before);
+    applyPreviewEditableChanges(
+      {
+        text: previousEntry.before.text,
+        color: previousEntry.before.color,
+        fontFamily: previousEntry.before.fontFamily,
+        fontSize: previousEntry.before.fontSize,
+        fontWeight: previousEntry.before.fontWeight,
+        backgroundColor: previousEntry.before.backgroundColor,
+        borderRadius: previousEntry.before.borderRadius,
+        imageUrl: previousEntry.before.imageUrl,
+        x: previousEntry.before.x,
+        y: previousEntry.before.y,
+      },
+      {
+        skipHistory: true,
+        targetId: previousEntry.id,
+      },
+    );
+  }, [applyPreviewEditableChanges, previewUndoHistory]);
+
+  const handleRedoPreviewChange = useCallback(() => {
+    if (previewRedoHistory.length === 0) {
+      return;
+    }
+
+    const nextEntry = previewRedoHistory[previewRedoHistory.length - 1];
+    setPreviewRedoHistory((previousHistory) => previousHistory.slice(0, -1));
+    setPreviewUndoHistory((previousHistory) => {
+      const nextHistory = [...previousHistory, nextEntry];
+      return nextHistory.slice(-previewEditHistoryLimit);
+    });
+
+    setVisualEditorEnabled(true);
+    setSelectedPreviewEditableId(nextEntry.id);
+    setPreviewEditableValues(nextEntry.after);
+    applyPreviewEditableChanges(
+      {
+        text: nextEntry.after.text,
+        color: nextEntry.after.color,
+        fontFamily: nextEntry.after.fontFamily,
+        fontSize: nextEntry.after.fontSize,
+        fontWeight: nextEntry.after.fontWeight,
+        backgroundColor: nextEntry.after.backgroundColor,
+        borderRadius: nextEntry.after.borderRadius,
+        imageUrl: nextEntry.after.imageUrl,
+        x: nextEntry.after.x,
+        y: nextEntry.after.y,
+      },
+      {
+        skipHistory: true,
+        targetId: nextEntry.id,
+      },
+    );
+  }, [applyPreviewEditableChanges, previewRedoHistory]);
+
+  const handleQuickEditorImageUpload = useCallback(
+    async (file: File) => {
+      if (!session) {
+        setCmsMediaUploadError("Please sign in before uploading media.");
+        return;
+      }
+
+      if (!file.type.startsWith("image/")) {
+        setCmsMediaUploadError("Only image files can be uploaded in Quick Editor.");
+        return;
+      }
+
+      setCmsMediaUploadError("");
+      setIsQuickImageUploading(true);
+
+      try {
+        const extension = file.name.includes(".") ? file.name.split(".").pop() : "jpg";
+        const baseName = sanitizeFileName(file.name.replace(/\.[^.]+$/, ""));
+        const uniquePath = `cms/${Date.now()}-${Math.random().toString(16).slice(2)}-${baseName || "asset"}.${extension}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from(cmsMediaBucket)
+          .upload(uniquePath, file, { upsert: false });
+
+        if (uploadError) {
+          setCmsMediaUploadError(uploadError.message);
+          return;
+        }
+
+        const { error: insertError } = await (supabase as any).from("cms_media_assets").insert({
+          bucket: cmsMediaBucket,
+          storage_path: uniquePath,
+          mime_type: file.type || null,
+          size_bytes: file.size,
+          created_by: session.user.id,
+        });
+
+        if (insertError) {
+          setCmsMediaUploadError(insertError.message);
+          return;
+        }
+
+        const publicUrl = supabase.storage.from(cmsMediaBucket).getPublicUrl(uniquePath).data.publicUrl;
+
+        setPreviewEditableValues((previous) => ({
+          ...previous,
+          imageUrl: publicUrl,
+        }));
+        applyPreviewEditableChanges({ imageUrl: publicUrl });
+
+        if (selectedCmsBinding?.kind === "image") {
+          setCmsBindingValue(selectedCmsBinding, "keyEn", publicUrl);
+        }
+
+        await fetchCmsWorkspace();
+      } finally {
+        setIsQuickImageUploading(false);
+      }
+    },
+    [
+      applyPreviewEditableChanges,
+      fetchCmsWorkspace,
+      selectedCmsBinding,
+      session,
+      setCmsBindingValue,
+      supabase,
+    ],
+  );
+
+  const handleQuickEditorImageInputChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file) {
+        await handleQuickEditorImageUpload(file);
+      }
+
+      event.target.value = "";
+    },
+    [handleQuickEditorImageUpload],
+  );
+
+  useEffect(() => {
+    const isTypingTarget = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) {
+        return false;
+      }
+
+      const tag = target.tagName.toLowerCase();
+      return tag === "input" || tag === "textarea" || tag === "select" || target.isContentEditable;
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target)) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      const modifierPressed = event.ctrlKey || event.metaKey;
+
+      if (!modifierPressed) {
+        return;
+      }
+
+      const isUndo = key === "z" && !event.shiftKey;
+      const isRedo = (key === "z" && event.shiftKey) || key === "y";
+
+      if (isUndo) {
+        if (activeAdminTab === "appearance") {
+          event.preventDefault();
+          handleUndoAppearanceChange();
+          return;
+        }
+
+        if (!visualEditorEnabled) {
+          return;
+        }
+
+        event.preventDefault();
+        handleUndoPreviewChange();
+        return;
+      }
+
+      if (isRedo) {
+        if (activeAdminTab === "appearance") {
+          event.preventDefault();
+          handleRedoAppearanceChange();
+          return;
+        }
+
+        if (!visualEditorEnabled) {
+          return;
+        }
+
+        event.preventDefault();
+        handleRedoPreviewChange();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    activeAdminTab,
+    handleRedoAppearanceChange,
+    handleRedoPreviewChange,
+    handleUndoAppearanceChange,
+    handleUndoPreviewChange,
+    visualEditorEnabled,
+  ]);
+
   const postPreviewDraft = useCallback(() => {
     if (!previewIframeRef.current?.contentWindow) {
       return;
@@ -1558,13 +2151,290 @@ export default function AdminPage() {
       },
       window.location.origin,
     );
-  }, [appearanceForm]);
+
+    previewIframeRef.current.contentWindow.postMessage(
+      {
+        type: "cms-preview:editor:toggle",
+        payload: { enabled: visualEditorEnabled },
+      },
+      window.location.origin,
+    );
+  }, [appearanceForm, visualEditorEnabled]);
 
   useEffect(() => {
     if (activeAdminTab === "appearance") {
       postPreviewDraft();
     }
   }, [activeAdminTab, postPreviewDraft]);
+
+  useEffect(() => {
+    postPreviewEditorToggle();
+  }, [postPreviewEditorToggle]);
+
+  useEffect(() => {
+    if (!visualEditorEnabled || !selectedPreviewEditableId || !previewIframeRef.current?.contentWindow) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      previewIframeRef.current?.contentWindow?.postMessage(
+        {
+          type: "cms-preview:editor:select",
+          payload: { id: selectedPreviewEditableId },
+        },
+        window.location.origin,
+      );
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [previewPath, selectedPreviewEditableId, visualEditorEnabled]);
+
+  useEffect(() => {
+    if (!visualEditorEnabled) {
+      setSelectedPreviewEditableId("");
+      setSelectedPreviewCapabilities(null);
+      setPreviewEditableValues(createInitialPreviewEditableValues());
+    }
+  }, [visualEditorEnabled]);
+
+  useEffect(() => {
+    if (!previewFullscreen) {
+      return;
+    }
+
+    const margin = 16;
+    const defaultWidth = 420;
+    const defaultHeight = Math.min(560, window.innerHeight - 120);
+    setPreviewFullscreenInspectorSize({
+      width: defaultWidth,
+      height: defaultHeight,
+    });
+    setPreviewFullscreenInspectorPosition({
+      left: Math.max(margin, window.innerWidth - defaultWidth - margin * 2),
+      top: 72,
+    });
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPreviewFullscreen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+
+    return () => {
+      window.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [previewFullscreen]);
+
+  useEffect(() => {
+    if (!previewFullscreen) {
+      return;
+    }
+
+    const margin = 16;
+    const minWidth = 320;
+    const minHeight = 220;
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (fullscreenInspectorDragRef.current) {
+        const drag = fullscreenInspectorDragRef.current;
+        const nextLeft = drag.startLeft + (event.clientX - drag.startClientX);
+        const nextTop = drag.startTop + (event.clientY - drag.startClientY);
+
+        const maxLeft = window.innerWidth - drag.width - margin;
+        const maxTop = window.innerHeight - drag.height - margin;
+
+        setPreviewFullscreenInspectorPosition({
+          left: Math.min(Math.max(margin, nextLeft), Math.max(margin, maxLeft)),
+          top: Math.min(Math.max(margin, nextTop), Math.max(margin, maxTop)),
+        });
+      }
+
+      if (fullscreenInspectorResizeRef.current) {
+        const resize = fullscreenInspectorResizeRef.current;
+        const nextWidth = resize.startWidth + (event.clientX - resize.startClientX);
+        const nextHeight = resize.startHeight + (event.clientY - resize.startClientY);
+        const maxWidth = window.innerWidth - resize.left - margin;
+        const maxHeight = window.innerHeight - resize.top - margin;
+
+        setPreviewFullscreenInspectorSize({
+          width: Math.min(Math.max(minWidth, nextWidth), Math.max(minWidth, maxWidth)),
+          height: Math.min(Math.max(minHeight, nextHeight), Math.max(minHeight, maxHeight)),
+        });
+      }
+    };
+
+    const handlePointerUp = () => {
+      fullscreenInspectorDragRef.current = null;
+      fullscreenInspectorResizeRef.current = null;
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [previewFullscreen]);
+
+  const handleFullscreenInspectorDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    fullscreenInspectorDragRef.current = {
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startLeft: previewFullscreenInspectorPosition.left,
+      startTop: previewFullscreenInspectorPosition.top,
+      width: previewFullscreenInspectorSize.width,
+      height: previewFullscreenInspectorSize.height,
+    };
+  };
+
+  const handleFullscreenInspectorResizeStart = (
+    event: React.PointerEvent<HTMLButtonElement>,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    fullscreenInspectorResizeRef.current = {
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startWidth: previewFullscreenInspectorSize.width,
+      startHeight: previewFullscreenInspectorSize.height,
+      left: previewFullscreenInspectorPosition.left,
+      top: previewFullscreenInspectorPosition.top,
+    };
+  };
+
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || !event.data) {
+        return;
+      }
+
+      const message = event.data as
+        | {
+            type: "cms-preview:selected";
+            payload: {
+              id: string;
+              capabilities: PreviewEditableCapabilities;
+              values: PreviewEditableValues;
+            };
+          }
+        | {
+            type: "cms-preview:position";
+            payload: {
+              id: string;
+              x: number;
+              y: number;
+            };
+          };
+
+      if (message.type === "cms-preview:selected") {
+        previewCommittedValuesRef.current.set(message.payload.id, message.payload.values);
+        setSelectedPreviewEditableId(message.payload.id);
+        setSelectedPreviewCapabilities(message.payload.capabilities);
+        setPreviewEditableValues(message.payload.values);
+        return;
+      }
+
+      if (message.type === "cms-preview:position" && message.payload.id === selectedPreviewEditableId) {
+        const committed =
+          previewCommittedValuesRef.current.get(message.payload.id) ?? createInitialPreviewEditableValues();
+
+        if (
+          !previewMoveHistoryDraftRef.current ||
+          previewMoveHistoryDraftRef.current.id !== message.payload.id
+        ) {
+          previewMoveHistoryDraftRef.current = {
+            id: message.payload.id,
+            before: { ...committed },
+            latestX: message.payload.x,
+            latestY: message.payload.y,
+          };
+        } else {
+          previewMoveHistoryDraftRef.current.latestX = message.payload.x;
+          previewMoveHistoryDraftRef.current.latestY = message.payload.y;
+        }
+
+        if (previewMoveHistoryTimerRef.current !== null) {
+          window.clearTimeout(previewMoveHistoryTimerRef.current);
+        }
+
+        previewMoveHistoryTimerRef.current = window.setTimeout(() => {
+          const draft = previewMoveHistoryDraftRef.current;
+          if (!draft) {
+            return;
+          }
+
+          const afterSnapshot: PreviewEditableValues = {
+            ...draft.before,
+            x: draft.latestX,
+            y: draft.latestY,
+          };
+
+          if (
+            draft.before.x !== afterSnapshot.x ||
+            draft.before.y !== afterSnapshot.y
+          ) {
+            setPreviewUndoHistory((previousHistory) => {
+              const nextHistory = [
+                ...previousHistory,
+                {
+                  id: draft.id,
+                  before: draft.before,
+                  after: afterSnapshot,
+                },
+              ];
+              return nextHistory.slice(-previewEditHistoryLimit);
+            });
+            setPreviewRedoHistory([]);
+          }
+
+          previewCommittedValuesRef.current.set(draft.id, afterSnapshot);
+          previewMoveHistoryDraftRef.current = null;
+          previewMoveHistoryTimerRef.current = null;
+        }, 180);
+
+        setPreviewEditableValues((previous) => ({
+          ...previous,
+          x: message.payload.x,
+          y: message.payload.y,
+        }));
+      }
+    };
+
+    window.addEventListener("message", handler);
+    return () => {
+      window.removeEventListener("message", handler);
+      if (previewMoveHistoryTimerRef.current !== null) {
+        window.clearTimeout(previewMoveHistoryTimerRef.current);
+      }
+      previewMoveHistoryTimerRef.current = null;
+      previewMoveHistoryDraftRef.current = null;
+    };
+  }, [selectedPreviewEditableId]);
+
+  useEffect(() => {
+    if (!selectedCmsBinding && !selectedNavigationRow) {
+      return;
+    }
+
+    setPreviewEditableValues((previous) => ({
+      ...previous,
+      ...(selectedCmsBinding?.kind === "text"
+        ? { text: getCmsBindingValue(selectedCmsBinding, "keyEn") }
+        : {}),
+      ...(selectedCmsBinding?.kind === "image"
+        ? { imageUrl: getCmsBindingValue(selectedCmsBinding, "keyEn") }
+        : {}),
+      ...(selectedNavigationRow ? { text: selectedNavigationRow.label } : {}),
+    }));
+  }, [getCmsBindingValue, selectedCmsBinding, selectedNavigationRow]);
 
   const handleCreateCategory = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2355,454 +3225,577 @@ export default function AdminPage() {
                 <Button type="button" variant="secondary" onClick={handleOpenPreviewInNewTab}>
                   Open Preview Tab
                 </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setAppearanceDrawerOpen(false);
+                    setPreviewFullscreenInspectorOpen(true);
+                    setPreviewFullscreen((previous) => {
+                      const next = !previous;
+                      if (next) {
+                        setVisualEditorEnabled(true);
+                      }
+                      return next;
+                    });
+                  }}
+                >
+                  {previewFullscreen ? "Exit Fullscreen" : "Fullscreen Editor"}
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-black/10 bg-white p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-[var(--color-ink)]">Visual Overlay Editor</h3>
+                  <p className="text-sm text-[var(--color-muted)]">
+                    Toggle edit mode, click an outlined element in preview, then edit style/content live.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleUndoPreviewChange}
+                    disabled={previewUndoHistory.length === 0}
+                    aria-label="Undo"
+                    title="Undo"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4"
+                    >
+                      <path d="M9 7 5 11l4 4" />
+                      <path d="M5 11h8a6 6 0 0 1 0 12h-1" />
+                    </svg>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleRedoPreviewChange}
+                    disabled={previewRedoHistory.length === 0}
+                    aria-label="Redo"
+                    title="Redo"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4"
+                    >
+                      <path d="m15 7 4 4-4 4" />
+                      <path d="M19 11h-8a6 6 0 0 0 0 12h1" />
+                    </svg>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={visualEditorEnabled ? "primary" : "secondary"}
+                    onClick={() => setVisualEditorEnabled((previous) => !previous)}
+                  >
+                    {visualEditorEnabled ? "Disable Overlay" : "Enable Overlay"}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-black/10 bg-[var(--color-neutral-100)]/45 p-4">
+                <p className="text-xs uppercase tracking-[0.16em] text-[var(--color-muted)]">
+                  Selected target
+                </p>
+                <p className="mt-1 text-sm font-medium text-[var(--color-ink)]">
+                  {selectedCmsBinding?.label || selectedNavigationBinding?.label || selectedPreviewEditableId || "Nothing selected yet"}
+                </p>
+
+                {selectedPreviewEditableId && selectedPreviewCapabilities ? (
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    {selectedPreviewCapabilities.text ? (
+                      <div className="md:col-span-2">
+                        <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                          Text (Live Preview)
+                        </label>
+                        <textarea
+                          className={fieldClassName}
+                          rows={3}
+                          value={previewEditableValues.text}
+                          onChange={(event) =>
+                            setPreviewEditableValues((previous) => ({
+                              ...previous,
+                              text: event.target.value,
+                            }))
+                          }
+                          onBlur={() => applyPreviewEditableChanges({ text: previewEditableValues.text })}
+                        />
+                      </div>
+                    ) : null}
+
+                    {selectedNavigationBinding && selectedNavigationRow ? (
+                      <>
+                        <div>
+                          <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                            Navigation Label EN
+                          </label>
+                          <input
+                            className={fieldClassName}
+                            value={selectedNavigationRow.label}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              updateSelectedNavigationRow("label", value);
+                              setPreviewEditableValues((previous) => ({ ...previous, text: value }));
+                              applyPreviewEditableChanges({ text: value });
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                            Navigation Label NL
+                          </label>
+                          <input
+                            className={fieldClassName}
+                            value={selectedNavigationRow.labelNl}
+                            onChange={(event) => updateSelectedNavigationRow("labelNl", event.target.value)}
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                            Link URL
+                          </label>
+                          <input
+                            className={fieldClassName}
+                            value={selectedNavigationRow.href}
+                            onChange={(event) => updateSelectedNavigationRow("href", event.target.value)}
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                            <input
+                              type="checkbox"
+                              checked={selectedNavigationRow.external}
+                              onChange={(event) => updateSelectedNavigationRow("external", event.target.checked)}
+                            />
+                            External Link
+                          </label>
+                        </div>
+                      </>
+                    ) : null}
+
+                    {selectedCmsBinding?.kind === "text" ? (
+                      <>
+                        <div>
+                          <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                            Draft English
+                          </label>
+                          <input
+                            className={fieldClassName}
+                            value={getCmsBindingValue(selectedCmsBinding, "keyEn")}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              setCmsBindingValue(selectedCmsBinding, "keyEn", value);
+                              setPreviewEditableValues((previous) => ({ ...previous, text: value }));
+                              applyPreviewEditableChanges({ text: value });
+                            }}
+                          />
+                        </div>
+                        {selectedCmsBinding.keyNl ? (
+                          <div>
+                            <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                              Draft Nederlands
+                            </label>
+                            <input
+                              className={fieldClassName}
+                              value={getCmsBindingValue(selectedCmsBinding, "keyNl")}
+                              onChange={(event) => {
+                                setCmsBindingValue(selectedCmsBinding, "keyNl", event.target.value);
+                              }}
+                            />
+                          </div>
+                        ) : null}
+                      </>
+                    ) : null}
+
+                    {selectedPreviewCapabilities.color ? (
+                      <div>
+                        <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                          Text color
+                        </label>
+                        <input
+                          type="color"
+                          className={fieldClassName}
+                          value={toColorInputValue(previewEditableValues.color)}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setPreviewEditableValues((previous) => ({ ...previous, color: value }));
+                            applyPreviewEditableChanges({ color: value });
+                          }}
+                        />
+                      </div>
+                    ) : null}
+
+                    {selectedPreviewCapabilities.background ? (
+                      <div>
+                        <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                          Background color
+                        </label>
+                        <input
+                          type="color"
+                          className={fieldClassName}
+                          value={toColorInputValue(previewEditableValues.backgroundColor)}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            setPreviewEditableValues((previous) => ({ ...previous, backgroundColor: value }));
+                            applyPreviewEditableChanges({ backgroundColor: value });
+                          }}
+                        />
+                      </div>
+                    ) : null}
+
+                    {selectedPreviewCapabilities.shape ? (
+                      <div>
+                        <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                          Border radius (e.g. 24px)
+                        </label>
+                        <input
+                          className={fieldClassName}
+                          value={previewEditableValues.borderRadius}
+                          onChange={(event) =>
+                            setPreviewEditableValues((previous) => ({
+                              ...previous,
+                              borderRadius: event.target.value,
+                            }))
+                          }
+                          onBlur={() =>
+                            applyPreviewEditableChanges({ borderRadius: previewEditableValues.borderRadius })
+                          }
+                        />
+                      </div>
+                    ) : null}
+
+                    {selectedPreviewCapabilities.image ? (
+                      <div className="md:col-span-2 space-y-3">
+                        <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                          Image URL
+                        </label>
+                        <input
+                          className={fieldClassName}
+                          value={previewEditableValues.imageUrl}
+                          onChange={(event) =>
+                            setPreviewEditableValues((previous) => ({
+                              ...previous,
+                              imageUrl: event.target.value,
+                            }))
+                          }
+                          onBlur={() => {
+                            applyPreviewEditableChanges({ imageUrl: previewEditableValues.imageUrl });
+                            if (selectedCmsBinding?.kind === "image") {
+                              setCmsBindingValue(selectedCmsBinding, "keyEn", previewEditableValues.imageUrl);
+                            }
+                          }}
+                        />
+
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                            Pick from CMS Media
+                          </p>
+                          {cmsMediaAssets.length === 0 ? (
+                            <p className="mt-2 text-xs text-[var(--color-muted)]">
+                              No media assets yet. Upload images in the Media Library section below.
+                            </p>
+                          ) : (
+                            <div className="mt-2 grid max-h-52 grid-cols-3 gap-2 overflow-y-auto rounded-xl border border-black/10 p-2 md:grid-cols-6">
+                              {cmsMediaAssets.slice(0, 36).map((asset) => {
+                                const publicUrl = getCmsMediaPublicUrl(asset);
+
+                                return (
+                                  <button
+                                    key={asset.id}
+                                    type="button"
+                                    className="overflow-hidden rounded-lg border border-black/10 bg-white"
+                                    onClick={() => {
+                                      setPreviewEditableValues((previous) => ({
+                                        ...previous,
+                                        imageUrl: publicUrl,
+                                      }));
+                                      applyPreviewEditableChanges({ imageUrl: publicUrl });
+                                      if (selectedCmsBinding?.kind === "image") {
+                                        setCmsBindingValue(selectedCmsBinding, "keyEn", publicUrl);
+                                      }
+                                    }}
+                                    title={asset.storage_path}
+                                  >
+                                    <img src={publicUrl} alt={asset.alt || asset.storage_path} className="h-16 w-full object-cover" />
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {selectedPreviewCapabilities.location ? (
+                      <div className="md:col-span-2 grid gap-3 md:grid-cols-2">
+                        <div>
+                          <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                            X offset
+                          </label>
+                          <input
+                            type="number"
+                            className={fieldClassName}
+                            value={previewEditableValues.x}
+                            onChange={(event) => {
+                              const value = Number(event.target.value || 0);
+                              setPreviewEditableValues((previous) => ({ ...previous, x: value }));
+                              applyPreviewEditableChanges({ x: value, y: previewEditableValues.y });
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                            Y offset
+                          </label>
+                          <input
+                            type="number"
+                            className={fieldClassName}
+                            value={previewEditableValues.y}
+                            onChange={(event) => {
+                              const value = Number(event.target.value || 0);
+                              setPreviewEditableValues((previous) => ({ ...previous, y: value }));
+                              applyPreviewEditableChanges({ x: previewEditableValues.x, y: value });
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-[var(--color-muted)]">
+                    Turn on overlay and click a highlighted element in the preview to inspect editable properties.
+                  </p>
+                )}
               </div>
             </div>
 
             <div className="mt-6 space-y-5 rounded-2xl border border-black/10 bg-[var(--color-neutral-100)]/55 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-lg font-semibold text-[var(--color-ink)]">CMS Workspace</h3>
+                  <h3 className="text-lg font-semibold text-[var(--color-ink)]">Global Editor</h3>
                   <p className="text-sm text-[var(--color-muted)]">
-                    Edit homepage copy, SEO, and navigation links in draft mode, then publish in one click.
+                    Control your whole site look from one place: colors, typography, button shape, and spacing.
                   </p>
                 </div>
-                <div className="text-xs text-[var(--color-muted)]">
-                  {cmsHomePublishedAt
-                    ? `Last published: ${new Date(cmsHomePublishedAt).toLocaleString()}`
-                    : "Not published yet"}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleUndoAppearanceChange}
+                    disabled={appearanceUndoHistory.length === 0}
+                    aria-label="Undo"
+                    title="Undo style change"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4"
+                    >
+                      <path d="M9 7 5 11l4 4" />
+                      <path d="M5 11h8a6 6 0 0 1 0 12h-1" />
+                    </svg>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleRedoAppearanceChange}
+                    disabled={appearanceRedoHistory.length === 0}
+                    aria-label="Redo"
+                    title="Redo style change"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4"
+                    >
+                      <path d="m15 7 4 4-4 4" />
+                      <path d="M19 11h-8a6 6 0 0 0 0 12h1" />
+                    </svg>
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={handleRestoreAppearanceDefault}>
+                    Restore Saved
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => void saveAppearanceSettings(appearanceForm)}
+                    disabled={savingAppearance || !appearanceDirty}
+                  >
+                    {savingAppearance ? "Saving..." : "Save Global Style"}
+                  </Button>
                 </div>
               </div>
 
-              {loadingCms ? (
-                <p className="rounded-lg bg-white px-4 py-2 text-sm text-[var(--color-muted)]">
-                  Loading CMS workspace...
+              {appearanceError ? (
+                <p className="rounded-lg bg-red-100 px-4 py-2 text-sm text-red-700">{appearanceError}</p>
+              ) : null}
+
+              {appearanceSuccess ? (
+                <p className="rounded-lg bg-emerald-100 px-4 py-2 text-sm text-emerald-700">{appearanceSuccess}</p>
+              ) : null}
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <label className="rounded-xl border border-black/10 bg-white p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                    Background
+                  </p>
+                  <input
+                    type="color"
+                    className="mt-2 h-10 w-full cursor-pointer rounded-lg border border-black/10"
+                    value={toColorInputValue(appearanceForm.colorBg)}
+                    onChange={(event) => updateAppearanceField("colorBg", event.target.value)}
+                  />
+                </label>
+
+                <label className="rounded-xl border border-black/10 bg-white p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                    Main Text
+                  </p>
+                  <input
+                    type="color"
+                    className="mt-2 h-10 w-full cursor-pointer rounded-lg border border-black/10"
+                    value={toColorInputValue(appearanceForm.colorInk)}
+                    onChange={(event) => updateAppearanceField("colorInk", event.target.value)}
+                  />
+                </label>
+
+                <label className="rounded-xl border border-black/10 bg-white p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                    Button Color
+                  </p>
+                  <input
+                    type="color"
+                    className="mt-2 h-10 w-full cursor-pointer rounded-lg border border-black/10"
+                    value={toColorInputValue(appearanceForm.colorWood)}
+                    onChange={(event) => updateAppearanceField("colorWood", event.target.value)}
+                  />
+                </label>
+
+                <label className="rounded-xl border border-black/10 bg-white p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                    Button Shape
+                  </p>
+                  <select
+                    className={`${fieldClassName} mt-2`}
+                    value={appearanceForm.buttonRadius}
+                    onChange={(event) => updateAppearanceField("buttonRadius", event.target.value)}
+                  >
+                    <option value="9999px">Pill</option>
+                    <option value="16px">Rounded</option>
+                    <option value="8px">Soft</option>
+                    <option value="0px">Square</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <label className="rounded-xl border border-black/10 bg-white p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                    Body Font
+                  </p>
+                  <select
+                    className={`${fieldClassName} mt-2`}
+                    value={appearanceForm.fontBody}
+                    onChange={(event) =>
+                      updateAppearanceField("fontBody", event.target.value as FontPreset)
+                    }
+                  >
+                    <option value="manrope">Manrope</option>
+                    <option value="jakarta">Jakarta Sans</option>
+                    <option value="system">System UI</option>
+                    <option value="serif">Serif</option>
+                  </select>
+                </label>
+
+                <label className="rounded-xl border border-black/10 bg-white p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                    Heading Font
+                  </p>
+                  <select
+                    className={`${fieldClassName} mt-2`}
+                    value={appearanceForm.fontHeading}
+                    onChange={(event) =>
+                      updateAppearanceField("fontHeading", event.target.value as FontPreset)
+                    }
+                  >
+                    <option value="jakarta">Jakarta Sans</option>
+                    <option value="manrope">Manrope</option>
+                    <option value="system">System UI</option>
+                    <option value="serif">Serif</option>
+                  </select>
+                </label>
+
+                <label className="rounded-xl border border-black/10 bg-white p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                    Layout Density
+                  </p>
+                  <select
+                    className={`${fieldClassName} mt-2`}
+                    value={appearanceForm.layoutMode}
+                    onChange={(event) =>
+                      updateAppearanceField("layoutMode", event.target.value as LayoutMode)
+                    }
+                  >
+                    <option value="compact">Compact</option>
+                    <option value="balanced">Balanced</option>
+                    <option value="spacious">Spacious</option>
+                  </select>
+                </label>
+
+                <label className="rounded-xl border border-black/10 bg-white p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                    Content Width
+                  </p>
+                  <select
+                    className={`${fieldClassName} mt-2`}
+                    value={appearanceForm.containerWidth}
+                    onChange={(event) =>
+                      updateAppearanceField("containerWidth", event.target.value as ContainerWidthMode)
+                    }
+                  >
+                    <option value="narrow">Narrow</option>
+                    <option value="standard">Standard</option>
+                    <option value="wide">Wide</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="rounded-xl border border-black/10 bg-white p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                  Need deeper controls?
                 </p>
-              ) : null}
-
-              {cmsError ? (
-                <p className="rounded-lg bg-red-100 px-4 py-2 text-sm text-red-700">{cmsError}</p>
-              ) : null}
-
-              {cmsSuccess ? (
-                <p className="rounded-lg bg-emerald-100 px-4 py-2 text-sm text-emerald-700">{cmsSuccess}</p>
-              ) : null}
-
-              <details open className="rounded-2xl border border-black/10 bg-white p-4">
-                <summary className="cursor-pointer text-sm font-semibold text-[var(--color-ink)]">
-                  Home Content (EN/NL)
-                </summary>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  {([
-                    { label: "Hero Eyebrow", keyEn: "heroEyebrow", keyNl: "heroEyebrowNl" },
-                    { label: "Hero Title", keyEn: "heroTitle", keyNl: "heroTitleNl" },
-                    {
-                      label: "Hero Description",
-                      keyEn: "heroDescription",
-                      keyNl: "heroDescriptionNl",
-                    },
-                    { label: "Hero Primary CTA", keyEn: "heroPrimaryCta", keyNl: "heroPrimaryCtaNl" },
-                    {
-                      label: "Hero Secondary CTA",
-                      keyEn: "heroSecondaryCta",
-                      keyNl: "heroSecondaryCtaNl",
-                    },
-                    { label: "Featured Eyebrow", keyEn: "featuredEyebrow", keyNl: "featuredEyebrowNl" },
-                    { label: "Featured Title", keyEn: "featuredTitle", keyNl: "featuredTitleNl" },
-                    {
-                      label: "Featured Description",
-                      keyEn: "featuredDescription",
-                      keyNl: "featuredDescriptionNl",
-                    },
-                    {
-                      label: "Categories Eyebrow",
-                      keyEn: "categoriesEyebrow",
-                      keyNl: "categoriesEyebrowNl",
-                    },
-                    { label: "Categories Title", keyEn: "categoriesTitle", keyNl: "categoriesTitleNl" },
-                    {
-                      label: "Categories Description",
-                      keyEn: "categoriesDescription",
-                      keyNl: "categoriesDescriptionNl",
-                    },
-                    { label: "Story Eyebrow", keyEn: "storyEyebrow", keyNl: "storyEyebrowNl" },
-                    { label: "Story Title", keyEn: "storyTitle", keyNl: "storyTitleNl" },
-                    {
-                      label: "Story Description",
-                      keyEn: "storyDescription",
-                      keyNl: "storyDescriptionNl",
-                    },
-                    { label: "Story Point One", keyEn: "storyPointOne", keyNl: "storyPointOneNl" },
-                    { label: "Story Point Two", keyEn: "storyPointTwo", keyNl: "storyPointTwoNl" },
-                    {
-                      label: "Story Point Three",
-                      keyEn: "storyPointThree",
-                      keyNl: "storyPointThreeNl",
-                    },
-                  ] as const).map((field) => (
-                    <div key={field.keyEn} className="space-y-2">
-                      <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-                        {field.label}
-                      </label>
-                      <input
-                        className={fieldClassName}
-                        value={cmsHomeDraft[field.keyEn]}
-                        onChange={(event) =>
-                          setCmsHomeDraft((previous) => ({
-                            ...previous,
-                            [field.keyEn]: event.target.value,
-                          }))
-                        }
-                        placeholder="English"
-                      />
-                      <input
-                        className={fieldClassName}
-                        value={cmsHomeDraft[field.keyNl]}
-                        onChange={(event) =>
-                          setCmsHomeDraft((previous) => ({
-                            ...previous,
-                            [field.keyNl]: event.target.value,
-                          }))
-                        }
-                        placeholder="Nederlands"
-                      />
-                    </div>
-                  ))}
-
-                  <div className="md:col-span-2">
-                    <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-                      Hero Image URL
-                    </label>
-                    <input
-                      className={fieldClassName}
-                      value={cmsHomeDraft.heroImage}
-                      onChange={(event) =>
-                        setCmsHomeDraft((previous) => ({ ...previous, heroImage: event.target.value }))
-                      }
-                      placeholder="https://..."
-                    />
-                  </div>
+                <p className="mt-1 text-sm text-[var(--color-muted)]">
+                  Open Controls for advanced tokens, color schemes, and legacy CMS settings.
+                </p>
+                <div className="mt-3">
+                  <Button type="button" variant="secondary" onClick={() => setAppearanceDrawerOpen(true)}>
+                    Open Advanced Controls
+                  </Button>
                 </div>
-              </details>
-
-              <details className="rounded-2xl border border-black/10 bg-white p-4">
-                <summary className="cursor-pointer text-sm font-semibold text-[var(--color-ink)]">
-                  Home SEO (Draft)
-                </summary>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div>
-                    <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-                      Meta Title
-                    </label>
-                    <input
-                      className={fieldClassName}
-                      value={cmsSeoDraft.metaTitle}
-                      onChange={(event) =>
-                        setCmsSeoDraft((previous) => ({ ...previous, metaTitle: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-                      OG Image URL
-                    </label>
-                    <input
-                      className={fieldClassName}
-                      value={cmsSeoDraft.ogImage}
-                      onChange={(event) =>
-                        setCmsSeoDraft((previous) => ({ ...previous, ogImage: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-                      Meta Description
-                    </label>
-                    <textarea
-                      className={fieldClassName}
-                      rows={3}
-                      value={cmsSeoDraft.metaDescription}
-                      onChange={(event) =>
-                        setCmsSeoDraft((previous) => ({
-                          ...previous,
-                          metaDescription: event.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-              </details>
-
-              {cmsAdditionalPageSlugs.map((slug) => (
-                <details key={slug} className="rounded-2xl border border-black/10 bg-white p-4">
-                  <summary className="cursor-pointer text-sm font-semibold capitalize text-[var(--color-ink)]">
-                    {slug} Page (Draft)
-                  </summary>
-
-                  <div className="mt-4 text-xs text-[var(--color-muted)]">
-                    {cmsPagePublishedAt[slug]
-                      ? `Last published: ${new Date(cmsPagePublishedAt[slug] as string).toLocaleString()}`
-                      : "Not published yet"}
-                  </div>
-
-                  <div className="mt-4 grid gap-3 md:grid-cols-2">
-                    {([
-                      { label: "Eyebrow", keyEn: "eyebrow", keyNl: "eyebrowNl" },
-                      { label: "Title", keyEn: "title", keyNl: "titleNl" },
-                      { label: "Description", keyEn: "description", keyNl: "descriptionNl" },
-                      { label: "Primary CTA", keyEn: "primaryCta", keyNl: "primaryCtaNl" },
-                      { label: "Secondary CTA", keyEn: "secondaryCta", keyNl: "secondaryCtaNl" },
-                    ] as const).map((field) => (
-                      <div key={field.keyEn} className="space-y-2">
-                        <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-                          {field.label}
-                        </label>
-                        <input
-                          className={fieldClassName}
-                          value={cmsPageDrafts[slug][field.keyEn]}
-                          onChange={(event) =>
-                            updateCmsPageField(slug, field.keyEn, event.target.value)
-                          }
-                          placeholder="English"
-                        />
-                        <input
-                          className={fieldClassName}
-                          value={cmsPageDrafts[slug][field.keyNl]}
-                          onChange={(event) =>
-                            updateCmsPageField(slug, field.keyNl, event.target.value)
-                          }
-                          placeholder="Nederlands"
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-4 grid gap-3 md:grid-cols-2">
-                    <div>
-                      <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-                        Meta Title
-                      </label>
-                      <input
-                        className={fieldClassName}
-                        value={cmsPageSeoDrafts[slug].metaTitle}
-                        onChange={(event) =>
-                          updateCmsPageSeoField(slug, "metaTitle", event.target.value)
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-                        OG Image URL
-                      </label>
-                      <input
-                        className={fieldClassName}
-                        value={cmsPageSeoDrafts[slug].ogImage}
-                        onChange={(event) =>
-                          updateCmsPageSeoField(slug, "ogImage", event.target.value)
-                        }
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-                        Meta Description
-                      </label>
-                      <textarea
-                        className={fieldClassName}
-                        rows={3}
-                        value={cmsPageSeoDrafts[slug].metaDescription}
-                        onChange={(event) =>
-                          updateCmsPageSeoField(slug, "metaDescription", event.target.value)
-                        }
-                      />
-                    </div>
-                  </div>
-                </details>
-              ))}
-
-              {([
-                { title: "Header Navigation", location: "header", rows: cmsHeaderLinks },
-                { title: "Footer Navigation", location: "footer", rows: cmsFooterLinks },
-              ] as const).map((section) => (
-                <details key={section.location} className="rounded-2xl border border-black/10 bg-white p-4">
-                  <summary className="cursor-pointer text-sm font-semibold text-[var(--color-ink)]">
-                    {section.title}
-                  </summary>
-
-                  <div className="mt-4 space-y-3">
-                    {section.rows.map((row) => (
-                      <div
-                        key={row.id}
-                        className="grid gap-2 rounded-xl border border-black/10 p-3 md:grid-cols-[1fr_1fr_1.2fr_auto_auto]"
-                      >
-                        <input
-                          className={fieldClassName}
-                          value={row.label}
-                          placeholder="Label EN"
-                          onChange={(event) =>
-                            updateCmsLink(section.location, row.id, "label", event.target.value)
-                          }
-                        />
-                        <input
-                          className={fieldClassName}
-                          value={row.labelNl}
-                          placeholder="Label NL"
-                          onChange={(event) =>
-                            updateCmsLink(section.location, row.id, "labelNl", event.target.value)
-                          }
-                        />
-                        <input
-                          className={fieldClassName}
-                          value={row.href}
-                          placeholder="/shop"
-                          onChange={(event) =>
-                            updateCmsLink(section.location, row.id, "href", event.target.value)
-                          }
-                        />
-                        <label className="mt-3 flex items-center gap-2 text-xs text-[var(--color-muted)]">
-                          <input
-                            type="checkbox"
-                            checked={row.external}
-                            onChange={(event) =>
-                              updateCmsLink(section.location, row.id, "external", event.target.checked)
-                            }
-                          />
-                          External
-                        </label>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="mt-2"
-                          onClick={() => removeCmsLink(section.location, row.id)}
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    ))}
-
-                    <Button type="button" variant="secondary" onClick={() => addCmsLink(section.location)}>
-                      Add Link
-                    </Button>
-                  </div>
-                </details>
-              ))}
-
-              <details className="rounded-2xl border border-black/10 bg-white p-4">
-                <summary className="cursor-pointer text-sm font-semibold text-[var(--color-ink)]">
-                  Media Library
-                </summary>
-
-                <div className="mt-4 space-y-3">
-                  <div className="rounded-xl border border-dashed border-black/15 bg-[var(--color-neutral-100)] px-4 py-4">
-                    <label className="inline-flex cursor-pointer items-center rounded-xl border border-black/10 bg-white px-4 py-2 text-sm font-medium text-[var(--color-ink)]">
-                      Upload images
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleCmsMediaInputChange}
-                      />
-                    </label>
-                    <p className="mt-2 text-xs text-[var(--color-muted)]">
-                      Uploaded files go to bucket "{cmsMediaBucket}" and are registered in cms_media_assets.
-                    </p>
-                    {isUploadingCmsMedia ? (
-                      <p className="mt-2 text-xs text-[var(--color-muted)]">Uploading CMS media...</p>
-                    ) : null}
-                    {cmsMediaUploadError ? (
-                      <p className="mt-2 rounded-lg bg-red-100 px-3 py-2 text-xs text-red-700">
-                        {cmsMediaUploadError}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="space-y-3">
-                    {cmsMediaAssets.length === 0 ? (
-                      <p className="text-xs text-[var(--color-muted)]">No CMS media assets uploaded yet.</p>
-                    ) : (
-                      cmsMediaAssets.map((asset) => {
-                        const publicUrl = supabase.storage
-                          .from(asset.bucket)
-                          .getPublicUrl(asset.storage_path).data.publicUrl;
-
-                        return (
-                          <div
-                            key={asset.id}
-                            className="rounded-xl border border-black/10 p-3"
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <a
-                                href={publicUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-xs font-medium text-[var(--color-wood)] underline"
-                              >
-                                {asset.storage_path}
-                              </a>
-                              <button
-                                type="button"
-                                className="text-xs font-medium text-[var(--color-muted)]"
-                                onClick={() => void navigator.clipboard.writeText(publicUrl)}
-                              >
-                                Copy URL
-                              </button>
-                            </div>
-
-                            <div className="mt-3 grid gap-2 md:grid-cols-2">
-                              <input
-                                className={fieldClassName}
-                                value={asset.alt ?? ""}
-                                placeholder="Alt text EN"
-                                onChange={(event) =>
-                                  setCmsMediaAssets((previous) =>
-                                    previous.map((row) =>
-                                      row.id === asset.id ? { ...row, alt: event.target.value } : row,
-                                    ),
-                                  )
-                                }
-                                onBlur={(event) =>
-                                  void handleUpdateCmsMediaAlt(asset.id, "alt", event.target.value)
-                                }
-                              />
-                              <input
-                                className={fieldClassName}
-                                value={asset.alt_nl ?? ""}
-                                placeholder="Alt text NL"
-                                onChange={(event) =>
-                                  setCmsMediaAssets((previous) =>
-                                    previous.map((row) =>
-                                      row.id === asset.id ? { ...row, alt_nl: event.target.value } : row,
-                                    ),
-                                  )
-                                }
-                                onBlur={(event) =>
-                                  void handleUpdateCmsMediaAlt(asset.id, "alt_nl", event.target.value)
-                                }
-                              />
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              </details>
-
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  onClick={() => void handleSaveCmsDraft()}
-                  disabled={loadingCms || savingCmsDraft || publishingCms}
-                >
-                  {savingCmsDraft ? "Saving Draft..." : "Save CMS Draft"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => void handlePublishCms()}
-                  disabled={loadingCms || savingCmsDraft || publishingCms}
-                >
-                  {publishingCms ? "Publishing..." : "Publish CMS"}
-                </Button>
               </div>
             </div>
 
@@ -2810,14 +3803,331 @@ export default function AdminPage() {
               <p className="mt-4 text-sm text-[var(--color-muted)]">Loading appearance settings...</p>
             ) : null}
 
-            <div className="mt-6 overflow-hidden rounded-2xl border border-black/10 bg-white">
+            <div
+              className={
+                previewFullscreen
+                  ? "fixed inset-4 z-[70] overflow-hidden rounded-2xl border border-black/10 bg-white shadow-2xl"
+                  : "mt-6 overflow-hidden rounded-2xl border border-black/10 bg-white"
+              }
+            >
+              {previewFullscreen ? (
+                <div className="flex items-center justify-between border-b border-black/10 bg-white px-4 py-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)]">
+                    Fullscreen Editor
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={handleUndoPreviewChange}
+                      disabled={previewUndoHistory.length === 0}
+                      aria-label="Undo"
+                      title="Undo"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-4 w-4"
+                      >
+                        <path d="M9 7 5 11l4 4" />
+                        <path d="M5 11h8a6 6 0 0 1 0 12h-1" />
+                      </svg>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={handleRedoPreviewChange}
+                      disabled={previewRedoHistory.length === 0}
+                      aria-label="Redo"
+                      title="Redo"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-4 w-4"
+                      >
+                        <path d="m15 7 4 4-4 4" />
+                        <path d="M19 11h-8a6 6 0 0 0 0 12h1" />
+                      </svg>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={visualEditorEnabled ? "primary" : "secondary"}
+                      onClick={() => setVisualEditorEnabled((previous) => !previous)}
+                    >
+                      {visualEditorEnabled ? "Selection On" : "Enable Selection"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() =>
+                        setPreviewFullscreenInspectorOpen((previous) => !previous)
+                      }
+                    >
+                      {previewFullscreenInspectorOpen ? "Hide Editor" : "Show Editor"}
+                    </Button>
+                    <Button type="button" variant="secondary" onClick={() => setPreviewFullscreen(false)}>
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               <iframe
                 ref={previewIframeRef}
                 src={previewPath}
                 title="Live storefront preview"
-                className="h-[78vh] w-full border-0"
+                className={previewFullscreen ? "h-[calc(100vh-4.5rem)] w-full border-0" : "h-[78vh] w-full border-0"}
                 onLoad={postPreviewDraft}
               />
+
+              {previewFullscreen && previewFullscreenInspectorOpen ? (
+                <aside
+                  className="absolute z-[80] overflow-auto rounded-2xl border border-black/10 bg-white/95 p-4 shadow-xl backdrop-blur"
+                  style={{
+                    left: `${previewFullscreenInspectorPosition.left}px`,
+                    top: `${previewFullscreenInspectorPosition.top}px`,
+                    width: `${previewFullscreenInspectorSize.width}px`,
+                    height: `${previewFullscreenInspectorSize.height}px`,
+                  }}
+                >
+                  <div
+                    className="-m-2 mb-2 cursor-move rounded-xl border border-black/10 bg-white/85 px-3 py-2"
+                    onPointerDown={handleFullscreenInspectorDragStart}
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)]">
+                      Quick Editor (Drag Me)
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-[var(--color-ink)]">
+                      {selectedCmsBinding?.label || selectedNavigationBinding?.label || selectedPreviewEditableId || "Select an element in preview"}
+                    </p>
+                  </div>
+
+                  {selectedPreviewEditableId && selectedPreviewCapabilities ? (
+                    <div className="mt-3 grid gap-3 pb-6">
+                      {selectedPreviewCapabilities.text ? (
+                        <>
+                          <textarea
+                            className={fieldClassName}
+                            rows={2}
+                            value={previewEditableValues.text}
+                            onChange={(event) =>
+                              setPreviewEditableValues((previous) => ({
+                                ...previous,
+                                text: event.target.value,
+                              }))
+                            }
+                            onBlur={() => applyPreviewEditableChanges({ text: previewEditableValues.text })}
+                          />
+
+                          {selectedPreviewCapabilities.color ? (
+                            <div>
+                              <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                                Text color
+                              </label>
+                              <input
+                                type="color"
+                                className={fieldClassName}
+                                value={toColorInputValue(previewEditableValues.color)}
+                                onChange={(event) => {
+                                  const value = event.target.value;
+                                  setPreviewEditableValues((previous) => ({ ...previous, color: value }));
+                                  applyPreviewEditableChanges({ color: value });
+                                }}
+                              />
+                            </div>
+                          ) : null}
+
+                          <div>
+                            <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                              Font family
+                            </label>
+                            <select
+                              className={fieldClassName}
+                              value={previewEditableValues.fontFamily || ""}
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                setPreviewEditableValues((previous) => ({ ...previous, fontFamily: value }));
+                                applyPreviewEditableChanges({ fontFamily: value });
+                              }}
+                            >
+                              <option value="">Keep current</option>
+                              <option value="var(--font-manrope), sans-serif">Manrope</option>
+                              <option value="var(--font-jakarta), sans-serif">Plus Jakarta Sans</option>
+                              <option value="Georgia, serif">Georgia</option>
+                              <option value="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace">
+                                Monospace
+                              </option>
+                            </select>
+                          </div>
+
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                                Font size
+                              </label>
+                              <input
+                                className={fieldClassName}
+                                value={previewEditableValues.fontSize}
+                                placeholder="e.g. 20px"
+                                onChange={(event) =>
+                                  setPreviewEditableValues((previous) => ({
+                                    ...previous,
+                                    fontSize: event.target.value,
+                                  }))
+                                }
+                                onBlur={() =>
+                                  applyPreviewEditableChanges({ fontSize: previewEditableValues.fontSize })
+                                }
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                                Font weight
+                              </label>
+                              <select
+                                className={fieldClassName}
+                                value={previewEditableValues.fontWeight || ""}
+                                onChange={(event) => {
+                                  const value = event.target.value;
+                                  setPreviewEditableValues((previous) => ({ ...previous, fontWeight: value }));
+                                  applyPreviewEditableChanges({ fontWeight: value });
+                                }}
+                              >
+                                <option value="">Keep current</option>
+                                <option value="400">Regular (400)</option>
+                                <option value="500">Medium (500)</option>
+                                <option value="600">Semibold (600)</option>
+                                <option value="700">Bold (700)</option>
+                              </select>
+                            </div>
+                          </div>
+                        </>
+                      ) : null}
+
+                      {selectedNavigationBinding && selectedNavigationRow ? (
+                        <>
+                          <input
+                            className={fieldClassName}
+                            value={selectedNavigationRow.label}
+                            placeholder="Navigation label EN"
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              updateSelectedNavigationRow("label", value);
+                              setPreviewEditableValues((previous) => ({ ...previous, text: value }));
+                              applyPreviewEditableChanges({ text: value });
+                            }}
+                          />
+                          <input
+                            className={fieldClassName}
+                            value={selectedNavigationRow.labelNl}
+                            placeholder="Navigation label NL"
+                            onChange={(event) => updateSelectedNavigationRow("labelNl", event.target.value)}
+                          />
+                        </>
+                      ) : null}
+
+                      {selectedCmsBinding?.kind === "text" ? (
+                        <>
+                          <input
+                            className={fieldClassName}
+                            value={getCmsBindingValue(selectedCmsBinding, "keyEn")}
+                            placeholder="Draft English"
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              setCmsBindingValue(selectedCmsBinding, "keyEn", value);
+                              setPreviewEditableValues((previous) => ({ ...previous, text: value }));
+                              applyPreviewEditableChanges({ text: value });
+                            }}
+                          />
+                          {selectedCmsBinding.keyNl ? (
+                            <input
+                              className={fieldClassName}
+                              value={getCmsBindingValue(selectedCmsBinding, "keyNl")}
+                              placeholder="Draft Nederlands"
+                              onChange={(event) => setCmsBindingValue(selectedCmsBinding, "keyNl", event.target.value)}
+                            />
+                          ) : null}
+                        </>
+                      ) : null}
+
+                      {selectedPreviewCapabilities.image ? (
+                        <div className="space-y-3">
+                          <div
+                            className="rounded-xl border border-dashed border-black/20 bg-[var(--color-neutral-100)]/60 px-4 py-4 text-center text-xs text-[var(--color-muted)]"
+                            onDragOver={(event) => {
+                              event.preventDefault();
+                              event.dataTransfer.dropEffect = "copy";
+                            }}
+                            onDrop={(event) => {
+                              event.preventDefault();
+                              const file = event.dataTransfer.files?.[0];
+                              if (file) {
+                                void handleQuickEditorImageUpload(file);
+                              }
+                            }}
+                          >
+                            <p className="font-semibold text-[var(--color-ink)]">
+                              Drag an image here to replace
+                            </p>
+                            <p className="mt-1">or click to upload from your device</p>
+                            <label className="mt-3 inline-flex cursor-pointer items-center rounded-xl border border-black/10 bg-white px-3 py-2 text-xs font-medium text-[var(--color-ink)]">
+                              Upload image
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleQuickEditorImageInputChange}
+                              />
+                            </label>
+                            {isQuickImageUploading ? (
+                              <p className="mt-2 text-xs text-[var(--color-muted)]">Uploading image...</p>
+                            ) : null}
+                          </div>
+
+                          <input
+                            className={fieldClassName}
+                            value={previewEditableValues.imageUrl}
+                            placeholder="Image URL"
+                            onChange={(event) =>
+                              setPreviewEditableValues((previous) => ({
+                                ...previous,
+                                imageUrl: event.target.value,
+                              }))
+                            }
+                            onBlur={() => {
+                              applyPreviewEditableChanges({ imageUrl: previewEditableValues.imageUrl });
+                              if (selectedCmsBinding?.kind === "image") {
+                                setCmsBindingValue(selectedCmsBinding, "keyEn", previewEditableValues.imageUrl);
+                              }
+                            }}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs text-[var(--color-muted)]">
+                      Click any outlined element in the preview to edit it here.
+                    </p>
+                  )}
+
+                  <button
+                    type="button"
+                    aria-label="Resize quick editor"
+                    className="absolute bottom-1 right-1 h-5 w-5 cursor-se-resize rounded border border-black/15 bg-[var(--color-neutral-100)]"
+                    onPointerDown={handleFullscreenInspectorResizeStart}
+                  />
+                </aside>
+              ) : null}
             </div>
 
             {appearanceDrawerOpen ? (

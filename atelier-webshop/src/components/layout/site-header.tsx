@@ -40,13 +40,15 @@ export const SiteHeader = ({
           aria-label="Primary"
           className="flex items-center gap-1 rounded-full bg-[var(--color-neutral-100)] p-1"
         >
-          {links.map((link) => (
+          {links.map((link, index) => (
             link.external ? (
               <a
                 key={link.href}
                 href={link.href}
                 target="_blank"
                 rel="noreferrer"
+                data-cms-editable={`nav.header.${index}.label`}
+                data-cms-edit-types="text,color,location"
                 className="rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-muted)] transition hover:bg-white hover:text-[var(--color-ink)] md:px-4"
               >
                 {link.label}
@@ -55,6 +57,8 @@ export const SiteHeader = ({
               <Link
                 key={link.href}
                 href={link.href}
+                data-cms-editable={`nav.header.${index}.label`}
+                data-cms-edit-types="text,color,location"
                 className="rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-muted)] transition hover:bg-white hover:text-[var(--color-ink)] md:px-4"
               >
                 {link.label}

@@ -28,20 +28,40 @@ export const CartContent = ({ cmsContent }: CartContentProps) => {
   if (items.length === 0) {
     return (
       <section className="mx-auto w-full max-w-5xl px-6 pb-20 pt-16 text-center md:px-10">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-wood)]">
+        <p
+          data-cms-editable="cart.eyebrow"
+          data-cms-edit-types="text,color,location"
+          className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-wood)]"
+        >
           {cmsContent?.eyebrow || t.cartEyebrow}
         </p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-[var(--color-ink)]">
+        <h1
+          data-cms-editable="cart.title"
+          data-cms-edit-types="text,color,location"
+          className="mt-3 text-4xl font-semibold tracking-tight text-[var(--color-ink)]"
+        >
           {cmsContent?.title || t.cartEmptyTitle}
         </h1>
-        <p className="mt-3 text-[var(--color-muted)]">
+        <p
+          data-cms-editable="cart.description"
+          data-cms-edit-types="text,color,location"
+          className="mt-3 text-[var(--color-muted)]"
+        >
           {cmsContent?.description || t.cartEmptyDescription}
         </p>
         <div className="mt-8 flex justify-center gap-3">
-          <Link href="/shop">
+          <Link
+            href="/shop"
+            data-cms-editable="cart.primaryCta"
+            data-cms-edit-types="text,color,shape,location,background"
+          >
             <Button>{cmsContent?.primaryCta || t.cartShopCta}</Button>
           </Link>
-          <Link href="/configurator">
+          <Link
+            href="/configurator"
+            data-cms-editable="cart.secondaryCta"
+            data-cms-edit-types="text,color,shape,location,background"
+          >
             <Button variant="secondary">{cmsContent?.secondaryCta || t.cartConfigCta}</Button>
           </Link>
         </div>
@@ -54,10 +74,18 @@ export const CartContent = ({ cmsContent }: CartContentProps) => {
       <div>
         <div className="mb-6 flex items-end justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-wood)]">
+            <p
+              data-cms-editable="cart.eyebrow"
+              data-cms-edit-types="text,color,location"
+              className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-wood)]"
+            >
               {cmsContent?.eyebrow || t.cartEyebrow}
             </p>
-            <h1 className="mt-2 text-4xl font-semibold tracking-tight text-[var(--color-ink)]">
+            <h1
+              data-cms-editable="cart.title"
+              data-cms-edit-types="text,color,location"
+              className="mt-2 text-4xl font-semibold tracking-tight text-[var(--color-ink)]"
+            >
               {cmsContent?.title || t.cartReviewTitle}
             </h1>
           </div>

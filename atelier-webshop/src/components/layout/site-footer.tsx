@@ -32,19 +32,27 @@ export const SiteFooter = ({ links: cmsLinks }: { links?: SiteFooterLink[] }) =>
         </div>
 
         <div className="flex flex-col gap-3 text-sm text-[var(--color-muted)]">
-          {links.map((link) =>
+          {links.map((link, index) =>
             link.external ? (
               <a
                 key={link.href}
                 href={link.href}
                 target="_blank"
                 rel="noreferrer"
+                data-cms-editable={`nav.footer.${index}.label`}
+                data-cms-edit-types="text,color,location"
                 className="hover:text-[var(--color-ink)]"
               >
                 {link.label}
               </a>
             ) : (
-              <Link key={link.href} href={link.href} className="hover:text-[var(--color-ink)]">
+              <Link
+                key={link.href}
+                href={link.href}
+                data-cms-editable={`nav.footer.${index}.label`}
+                data-cms-edit-types="text,color,location"
+                className="hover:text-[var(--color-ink)]"
+              >
                 {link.label}
               </Link>
             ),
