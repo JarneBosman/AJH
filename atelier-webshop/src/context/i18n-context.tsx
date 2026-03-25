@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   defaultLanguage,
   getTranslations,
@@ -26,14 +27,21 @@ export const I18nProvider = ({
   initialLanguage: Language;
   children: React.ReactNode;
 }) => {
+  const router = useRouter();
   const [language, setLanguageState] = useState<Language>(normalizeLanguage(initialLanguage));
 
   const setLanguage = (nextLanguage: Language) => {
     const normalized = normalizeLanguage(nextLanguage);
+
+    if (normalized === language) {
+      return;
+    }
+
     setLanguageState(normalized);
     localStorage.setItem(languageStorageKey, normalized);
     document.cookie = `${languageCookieName}=${normalized}; path=/; max-age=31536000; samesite=lax`;
     document.documentElement.lang = normalized;
+    router.refresh();
   };
 
   const value = useMemo<I18nContextValue>(
