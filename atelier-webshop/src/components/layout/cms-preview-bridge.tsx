@@ -66,6 +66,8 @@ interface OverlaySelectedMessage {
       imageUrl: string;
       x: number;
       y: number;
+      width: number;
+      height: number;
     };
   };
 }
@@ -76,7 +78,25 @@ type PreviewMessage =
       payload: AppearancePreviewPayload;
     }
   | {
+      type: "cms-preview:home-custom-blocks";
+      payload: {
+        blocks: Array<{
+          id: string;
+          type: "text" | "image";
+          text?: string;
+          imageUrl?: string;
+          alt?: string;
+          backgroundColor?: string;
+          backgroundShape?: "rounded-square" | "pill";
+        }>;
+      };
+    }
+  | {
       type: "cms-preview:editor:toggle";
+      payload: { enabled: boolean };
+    }
+  | {
+      type: "cms-preview:editor:grid-toggle";
       payload: { enabled: boolean };
     }
   | {
@@ -98,6 +118,8 @@ type PreviewMessage =
           imageUrl: string;
           x: number;
           y: number;
+          width: number;
+          height: number;
         }>;
       };
     };
@@ -124,6 +146,64 @@ const parseEditTypes = (element: HTMLElement) => {
 const findEditableElementById = (id: string) =>
   document.querySelector<HTMLElement>(`[data-cms-editable=\"${id}\"]`);
 
+type ResizeEdge = "left" | "right" | "top" | "bottom";
+
+const getResizeEdgesAtPointer = (
+  element: HTMLElement,
+  clientX: number,
+  clientY: number,
+  threshold = 10,
+): ResizeEdge[] => {
+  const rect = element.getBoundingClientRect();
+  const edges: ResizeEdge[] = [];
+
+  if (Math.abs(clientX - rect.left) <= threshold) {
+    edges.push("left");
+  }
+
+  if (Math.abs(clientX - rect.right) <= threshold) {
+    edges.push("right");
+  }
+
+  if (Math.abs(clientY - rect.top) <= threshold) {
+    edges.push("top");
+  }
+
+  if (Math.abs(clientY - rect.bottom) <= threshold) {
+    edges.push("bottom");
+  }
+
+  return edges;
+};
+
+const getCursorForEdges = (edges: ResizeEdge[]): string => {
+  if (edges.includes("left") && edges.includes("top")) {
+    return "nwse-resize";
+  }
+
+  if (edges.includes("right") && edges.includes("bottom")) {
+    return "nwse-resize";
+  }
+
+  if (edges.includes("right") && edges.includes("top")) {
+    return "nesw-resize";
+  }
+
+  if (edges.includes("left") && edges.includes("bottom")) {
+    return "nesw-resize";
+  }
+
+  if (edges.includes("left") || edges.includes("right")) {
+    return "ew-resize";
+  }
+
+  if (edges.includes("top") || edges.includes("bottom")) {
+    return "ns-resize";
+  }
+
+  return "move";
+};
+
 const findTextTarget = (element: HTMLElement) => {
   const selector = element.dataset.cmsTextTarget;
 
@@ -141,13 +221,40 @@ const findImageTarget = (element: HTMLElement) => {
   const selector = element.dataset.cmsImageTarget;
 
   if (selector) {
-    const target = element.querySelector<HTMLImageElement>(selector);
+    const target = element.querySelector<HTMLElement>(selector);
     if (target) {
       return target;
     }
   }
 
-  return element.querySelector<HTMLImageElement>("img");
+  return element.querySelector<HTMLElement>("img");
+};
+
+const extractBackgroundImageUrl = (backgroundImage: string) => {
+  if (!backgroundImage || backgroundImage === "none") {
+    return "";
+  }
+
+  const match = backgroundImage.match(/url\(["']?(.*?)["']?\)/i);
+  return match?.[1] ?? "";
+};
+
+const setImageUrlOnTarget = (target: HTMLElement, nextUrl: string) => {
+  const trimmedUrl = nextUrl.trim();
+  if (!trimmedUrl) {
+    return;
+  }
+
+  if (target instanceof HTMLImageElement) {
+    // Clear srcset to ensure the browser renders the freshly selected URL.
+    target.removeAttribute("srcset");
+    target.srcset = "";
+    target.src = trimmedUrl;
+    target.setAttribute("src", trimmedUrl);
+    return;
+  }
+
+  target.style.backgroundImage = `url("${trimmedUrl}")`;
 };
 
 const collectValues = (element: HTMLElement) => {
@@ -155,6 +262,11 @@ const collectValues = (element: HTMLElement) => {
   const textTarget = findTextTarget(element);
   const textComputed = window.getComputedStyle(textTarget ?? element);
   const imageTarget = findImageTarget(element);
+  const imageUrl = imageTarget
+    ? imageTarget instanceof HTMLImageElement
+      ? imageTarget.currentSrc || imageTarget.src
+      : extractBackgroundImageUrl(window.getComputedStyle(imageTarget).backgroundImage)
+    : "";
 
   return {
     text: textTarget?.textContent?.trim() ?? "",
@@ -164,15 +276,90 @@ const collectValues = (element: HTMLElement) => {
     fontWeight: textComputed.fontWeight,
     backgroundColor: computed.backgroundColor,
     borderRadius: computed.borderRadius,
-    imageUrl: imageTarget?.src ?? "",
+    imageUrl,
     x: clampNumeric(Number(element.dataset.cmsX ?? "0")),
     y: clampNumeric(Number(element.dataset.cmsY ?? "0")),
+    width: Math.round(element.getBoundingClientRect().width),
+    height: Math.round(element.getBoundingClientRect().height),
   };
+};
+
+const renderHomeCustomBlocks = (
+  blocks: Array<{
+    id: string;
+    type: "text" | "image";
+    text?: string;
+    imageUrl?: string;
+    alt?: string;
+    backgroundColor?: string;
+    backgroundShape?: "rounded-square" | "pill";
+  }>,
+  attempt = 0,
+) => {
+  const section = document.querySelector<HTMLElement>("[data-cms-custom-blocks-section]");
+  const container = document.querySelector<HTMLElement>("[data-cms-custom-blocks]");
+  if (!section || !container) {
+    if (attempt < 6) {
+      window.setTimeout(() => renderHomeCustomBlocks(blocks, attempt + 1), 120);
+    }
+    return;
+  }
+
+  container.replaceChildren();
+
+  for (const block of blocks) {
+    const nextRadius = block.backgroundShape === "pill" ? "9999px" : "1.5rem";
+    const nextBackground = block.backgroundColor?.trim() || "#ffffff";
+
+    if (block.type === "text") {
+      const article = document.createElement("article");
+      article.className =
+        "rounded-3xl border border-black/5 bg-white px-5 py-6 text-[var(--color-muted)] shadow-[0_20px_45px_-35px_rgba(0,0,0,0.45)]";
+      article.style.backgroundColor = nextBackground;
+      article.style.borderRadius = nextRadius;
+
+      const paragraph = document.createElement("p");
+      paragraph.className = "leading-7";
+      paragraph.textContent = block.text?.trim() || "New text block";
+
+      article.appendChild(paragraph);
+      container.appendChild(article);
+      continue;
+    }
+
+    if (block.type === "image" && block.imageUrl?.trim()) {
+      const figure = document.createElement("figure");
+      figure.className =
+        "relative overflow-hidden rounded-3xl border border-black/5 bg-white shadow-[0_25px_55px_-35px_rgba(0,0,0,0.5)]";
+      figure.style.backgroundColor = nextBackground;
+      figure.style.borderRadius = nextRadius;
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "relative aspect-[4/3] w-full";
+
+      const image = document.createElement("img");
+      image.src = block.imageUrl;
+      image.alt = block.alt?.trim() || "Homepage custom block image";
+      image.className = "h-full w-full object-cover";
+
+      wrapper.appendChild(image);
+      figure.appendChild(wrapper);
+      container.appendChild(figure);
+    }
+  }
+
+  if (container.children.length === 0) {
+    section.classList.add("hidden");
+  } else {
+    section.classList.remove("hidden");
+  }
 };
 
 export const CmsPreviewBridge = () => {
   useEffect(() => {
     let editorEnabled = false;
+    let gridSnapEnabled = false;
+    const gridStep = 12;
     let selectedId: string | null = null;
     let dragState:
       | {
@@ -181,6 +368,18 @@ export const CmsPreviewBridge = () => {
           startClientY: number;
           startX: number;
           startY: number;
+        }
+      | null = null;
+    let resizeState:
+      | {
+          id: string;
+          edges: ResizeEdge[];
+          startClientX: number;
+          startClientY: number;
+          startX: number;
+          startY: number;
+          startWidth: number;
+          startHeight: number;
         }
       | null = null;
 
@@ -231,53 +430,64 @@ export const CmsPreviewBridge = () => {
         imageUrl: string;
         x: number;
         y: number;
+        width: number;
+        height: number;
       }>,
     ) => {
+      const capabilities = parseEditTypes(element);
       const textTarget = findTextTarget(element) ?? element;
 
-      if (changes.text !== undefined) {
+      if (capabilities.text && changes.text !== undefined) {
         if (textTarget) {
           textTarget.textContent = changes.text;
         }
       }
 
-      if (changes.color !== undefined) {
+      if (capabilities.color && changes.color !== undefined) {
         textTarget.style.color = changes.color;
       }
 
-      if (changes.fontFamily !== undefined) {
+      if ((capabilities.text || capabilities.color) && changes.fontFamily !== undefined) {
         textTarget.style.fontFamily = changes.fontFamily;
       }
 
-      if (changes.fontSize !== undefined) {
+      if ((capabilities.text || capabilities.color) && changes.fontSize !== undefined) {
         textTarget.style.fontSize = changes.fontSize;
       }
 
-      if (changes.fontWeight !== undefined) {
+      if ((capabilities.text || capabilities.color) && changes.fontWeight !== undefined) {
         textTarget.style.fontWeight = changes.fontWeight;
       }
 
-      if (changes.backgroundColor !== undefined) {
+      if (capabilities.background && changes.backgroundColor !== undefined) {
         element.style.backgroundColor = changes.backgroundColor;
       }
 
-      if (changes.borderRadius !== undefined) {
+      if (capabilities.shape && changes.borderRadius !== undefined) {
         element.style.borderRadius = changes.borderRadius;
       }
 
-      if (changes.imageUrl !== undefined) {
+      if (capabilities.image && changes.imageUrl !== undefined) {
         const imageTarget = findImageTarget(element);
-        if (imageTarget && changes.imageUrl.trim()) {
-          imageTarget.src = changes.imageUrl.trim();
+        if (imageTarget) {
+          setImageUrlOnTarget(imageTarget, changes.imageUrl);
         }
       }
 
-      if (changes.x !== undefined || changes.y !== undefined) {
+      if (capabilities.location && (changes.x !== undefined || changes.y !== undefined)) {
         const x = clampNumeric(changes.x ?? Number(element.dataset.cmsX ?? "0"));
         const y = clampNumeric(changes.y ?? Number(element.dataset.cmsY ?? "0"));
         element.dataset.cmsX = String(x);
         element.dataset.cmsY = String(y);
         element.style.transform = `translate(${x}px, ${y}px)`;
+      }
+
+      if (capabilities.location && changes.width !== undefined) {
+        element.style.width = `${Math.max(1, Math.round(changes.width))}px`;
+      }
+
+      if (capabilities.location && changes.height !== undefined) {
+        element.style.height = `${Math.max(1, Math.round(changes.height))}px`;
       }
     };
 
@@ -315,6 +525,11 @@ export const CmsPreviewBridge = () => {
         return;
       }
 
+      if (message.type === "cms-preview:home-custom-blocks") {
+        renderHomeCustomBlocks(message.payload.blocks);
+        return;
+      }
+
       if (message.type === "cms-preview:editor:toggle") {
         editorEnabled = Boolean(message.payload.enabled);
 
@@ -323,6 +538,11 @@ export const CmsPreviewBridge = () => {
         }
 
         updateEditorState();
+        return;
+      }
+
+      if (message.type === "cms-preview:editor:grid-toggle") {
+        gridSnapEnabled = Boolean(message.payload.enabled);
         return;
       }
 
@@ -369,6 +589,25 @@ export const CmsPreviewBridge = () => {
         return;
       }
 
+      const resizeEdges = getResizeEdgesAtPointer(selectedElement, event.clientX, event.clientY);
+
+      if (resizeEdges.length > 0) {
+        const rect = selectedElement.getBoundingClientRect();
+        resizeState = {
+          id: selectedId,
+          edges: resizeEdges,
+          startClientX: event.clientX,
+          startClientY: event.clientY,
+          startX: clampNumeric(Number(selectedElement.dataset.cmsX ?? "0")),
+          startY: clampNumeric(Number(selectedElement.dataset.cmsY ?? "0")),
+          startWidth: rect.width,
+          startHeight: rect.height,
+        };
+
+        event.preventDefault();
+        return;
+      }
+
       dragState = {
         id: selectedId,
         startClientX: event.clientX,
@@ -381,7 +620,102 @@ export const CmsPreviewBridge = () => {
     };
 
     const handlePointerMove = (event: PointerEvent) => {
+      if (resizeState) {
+        const element = findEditableElementById(resizeState.id);
+        if (!element) {
+          return;
+        }
+
+        const deltaX = event.clientX - resizeState.startClientX;
+        const deltaY = event.clientY - resizeState.startClientY;
+        const minWidth = 48;
+        const minHeight = 48;
+
+        let nextX = resizeState.startX;
+        let nextY = resizeState.startY;
+        let nextWidth = resizeState.startWidth;
+        let nextHeight = resizeState.startHeight;
+
+        if (resizeState.edges.includes("right")) {
+          nextWidth = Math.max(minWidth, resizeState.startWidth + deltaX);
+        }
+
+        if (resizeState.edges.includes("bottom")) {
+          nextHeight = Math.max(minHeight, resizeState.startHeight + deltaY);
+        }
+
+        if (resizeState.edges.includes("left")) {
+          const rawWidth = resizeState.startWidth - deltaX;
+          nextWidth = Math.max(minWidth, rawWidth);
+          nextX = resizeState.startX + (resizeState.startWidth - nextWidth);
+        }
+
+        if (resizeState.edges.includes("top")) {
+          const rawHeight = resizeState.startHeight - deltaY;
+          nextHeight = Math.max(minHeight, rawHeight);
+          nextY = resizeState.startY + (resizeState.startHeight - nextHeight);
+        }
+
+        if (gridSnapEnabled) {
+          nextWidth = Math.max(minWidth, Math.round(nextWidth / gridStep) * gridStep);
+          nextHeight = Math.max(minHeight, Math.round(nextHeight / gridStep) * gridStep);
+          nextX = Math.round(nextX / gridStep) * gridStep;
+          nextY = Math.round(nextY / gridStep) * gridStep;
+        } else {
+          nextWidth = Math.round(nextWidth);
+          nextHeight = Math.round(nextHeight);
+          nextX = Math.round(nextX);
+          nextY = Math.round(nextY);
+        }
+
+        element.style.width = `${nextWidth}px`;
+        element.style.height = `${nextHeight}px`;
+        element.dataset.cmsX = String(nextX);
+        element.dataset.cmsY = String(nextY);
+        element.style.transform = `translate(${nextX}px, ${nextY}px)`;
+
+        window.parent.postMessage(
+          {
+            type: "cms-preview:position",
+            payload: {
+              id: resizeState.id,
+              x: nextX,
+              y: nextY,
+              width: nextWidth,
+              height: nextHeight,
+            },
+          },
+          window.location.origin,
+        );
+
+        return;
+      }
+
       if (!dragState) {
+        if (!editorEnabled || !selectedId) {
+          return;
+        }
+
+        const selectedElement = findEditableElementById(selectedId);
+        if (!selectedElement) {
+          return;
+        }
+
+        const pointerTarget = event.target as HTMLElement | null;
+        const withinSelected = pointerTarget?.closest(`[data-cms-editable=\"${selectedId}\"]`);
+        if (!withinSelected) {
+          selectedElement.style.cursor = "";
+          return;
+        }
+
+        const capabilities = parseEditTypes(selectedElement);
+        if (!capabilities.location) {
+          selectedElement.style.cursor = "";
+          return;
+        }
+
+        const edges = getResizeEdgesAtPointer(selectedElement, event.clientX, event.clientY);
+        selectedElement.style.cursor = getCursorForEdges(edges);
         return;
       }
 
@@ -393,17 +727,22 @@ export const CmsPreviewBridge = () => {
       const x = dragState.startX + (event.clientX - dragState.startClientX);
       const y = dragState.startY + (event.clientY - dragState.startClientY);
 
-      element.dataset.cmsX = String(Math.round(x));
-      element.dataset.cmsY = String(Math.round(y));
-      element.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+      const nextX = gridSnapEnabled ? Math.round(x / gridStep) * gridStep : Math.round(x);
+      const nextY = gridSnapEnabled ? Math.round(y / gridStep) * gridStep : Math.round(y);
+
+      element.dataset.cmsX = String(nextX);
+      element.dataset.cmsY = String(nextY);
+      element.style.transform = `translate(${nextX}px, ${nextY}px)`;
 
       window.parent.postMessage(
         {
           type: "cms-preview:position",
           payload: {
             id: dragState.id,
-            x: Math.round(x),
-            y: Math.round(y),
+            x: nextX,
+            y: nextY,
+            width: Math.round(element.getBoundingClientRect().width),
+            height: Math.round(element.getBoundingClientRect().height),
           },
         },
         window.location.origin,
@@ -411,7 +750,15 @@ export const CmsPreviewBridge = () => {
     };
 
     const handlePointerUp = () => {
+      if (resizeState) {
+        const element = findEditableElementById(resizeState.id);
+        if (element) {
+          postSelectedToParent(element);
+        }
+      }
+
       dragState = null;
+      resizeState = null;
     };
 
     const handleClick = (event: MouseEvent) => {

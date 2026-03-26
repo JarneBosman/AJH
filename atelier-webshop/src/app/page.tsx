@@ -12,7 +12,6 @@ import { getFeaturedProducts } from "@/lib/products-repository";
 import { getTranslations, languageCookieName, normalizeLanguage } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
-
 export async function generateMetadata(): Promise<Metadata> {
   const cookieStore = await cookies();
   const language = normalizeLanguage(cookieStore.get(languageCookieName)?.value);
@@ -41,6 +40,7 @@ export default async function Home() {
   const categories = (await getAllCategoriesFromStore()).map((category) =>
     localizeCategory(category, language),
   );
+  const customBlocks = cmsHome?.customBlocks ?? [];
 
   return (
     <div className="pb-20">
@@ -53,14 +53,14 @@ export default async function Home() {
         <div data-home-hero-copy className="animate-rise max-w-xl space-y-6">
           <p
             data-cms-editable="home.heroEyebrow"
-            data-cms-edit-types="text,color,location"
+            data-cms-edit-types="text,color,shape,location,background"
             className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--color-wood)]"
           >
             {cmsHome?.heroEyebrow || t.homeHeroEyebrow}
           </p>
           <h1
             data-cms-editable="home.heroTitle"
-            data-cms-edit-types="text,color,location"
+            data-cms-edit-types="text,color,shape,location,background"
             className="text-balance text-4xl font-semibold leading-tight tracking-tight text-[var(--color-ink)] sm:text-5xl md:text-6xl"
           >
             {cmsHome?.heroTitle || t.homeHeroTitle}
@@ -73,19 +73,22 @@ export default async function Home() {
             {cmsHome?.heroDescription || t.homeHeroDescription}
           </p>
           <div data-home-hero-actions className="flex flex-wrap gap-3">
-            <Link
-              href="/shop"
-              data-cms-editable="home.heroPrimaryCta"
-              data-cms-edit-types="text,color,shape,location,background"
-            >
-              <Button>{cmsHome?.heroPrimaryCta || t.homeHeroPrimaryCta}</Button>
+            <Link href="/shop">
+              <Button
+                data-cms-editable="home.heroPrimaryCta"
+                data-cms-edit-types="text,color,shape,location,background"
+              >
+                {cmsHome?.heroPrimaryCta || t.homeHeroPrimaryCta}
+              </Button>
             </Link>
-            <Link
-              href="/configurator"
-              data-cms-editable="home.heroSecondaryCta"
-              data-cms-edit-types="text,color,shape,location,background"
-            >
-              <Button variant="secondary">{cmsHome?.heroSecondaryCta || t.homeHeroSecondaryCta}</Button>
+            <Link href="/configurator">
+              <Button
+                variant="secondary"
+                data-cms-editable="home.heroSecondaryCta"
+                data-cms-edit-types="text,color,shape,location,background"
+              >
+                {cmsHome?.heroSecondaryCta || t.homeHeroSecondaryCta}
+              </Button>
             </Link>
           </div>
         </div>
@@ -184,16 +187,59 @@ export default async function Home() {
             descriptionEditableId="home.storyDescription"
           />
           <div className="mt-8 grid gap-4 text-sm text-[var(--color-muted)] md:grid-cols-3">
-            <p data-cms-editable="home.storyPointOne" data-cms-edit-types="text,color,location">
+            <p data-cms-editable="home.storyPointOne" data-cms-edit-types="text,color,shape,location,background">
               {cmsHome?.storyPointOne || t.homeStoryPointOne}
             </p>
-            <p data-cms-editable="home.storyPointTwo" data-cms-edit-types="text,color,location">
+            <p data-cms-editable="home.storyPointTwo" data-cms-edit-types="text,color,shape,location,background">
               {cmsHome?.storyPointTwo || t.homeStoryPointTwo}
             </p>
-            <p data-cms-editable="home.storyPointThree" data-cms-edit-types="text,color,location">
+            <p data-cms-editable="home.storyPointThree" data-cms-edit-types="text,color,shape,location,background">
               {cmsHome?.storyPointThree || t.homeStoryPointThree}
             </p>
           </div>
+        </div>
+      </section>
+
+      <section
+        data-cms-custom-blocks-section
+        className={`mx-auto mt-14 w-full max-w-7xl px-4 sm:px-6 md:mt-20 md:px-10 ${
+          customBlocks.length === 0 ? "hidden" : ""
+        }`}
+      >
+        <div data-cms-custom-blocks className="grid gap-5 md:grid-cols-2">
+          {customBlocks.map((block) =>
+            block.type === "text" ? (
+              <article
+                key={block.id}
+                className="rounded-3xl border border-black/5 bg-white px-5 py-6 text-[var(--color-muted)] shadow-[0_20px_45px_-35px_rgba(0,0,0,0.45)]"
+                style={{
+                  backgroundColor: block.backgroundColor || "#ffffff",
+                  borderRadius: block.backgroundShape === "pill" ? "9999px" : "1.5rem",
+                }}
+              >
+                <p className="leading-7">{block.text}</p>
+              </article>
+            ) : (
+              <figure
+                key={block.id}
+                className="relative overflow-hidden rounded-3xl border border-black/5 bg-white shadow-[0_25px_55px_-35px_rgba(0,0,0,0.5)]"
+                style={{
+                  backgroundColor: block.backgroundColor || "#ffffff",
+                  borderRadius: block.backgroundShape === "pill" ? "9999px" : "1.5rem",
+                }}
+              >
+                <div className="relative aspect-[4/3] w-full">
+                  <Image
+                    src={block.imageUrl || ""}
+                    alt={block.alt || "Homepage custom block image"}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                  />
+                </div>
+              </figure>
+            ),
+          )}
         </div>
       </section>
     </div>

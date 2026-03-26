@@ -11,6 +11,16 @@ export interface CmsLinkItem {
   external?: boolean;
 }
 
+export interface CmsHomeCustomBlock {
+  id: string;
+  type: "text" | "image";
+  text?: string;
+  imageUrl?: string;
+  alt?: string;
+  backgroundColor?: string;
+  backgroundShape?: "rounded-square" | "pill";
+}
+
 export interface CmsHomeContent {
   heroEyebrow?: string;
   heroTitle?: string;
@@ -30,6 +40,7 @@ export interface CmsHomeContent {
   storyPointOne?: string;
   storyPointTwo?: string;
   storyPointThree?: string;
+  customBlocks?: CmsHomeCustomBlock[];
 }
 
 export interface CmsGenericPageContent {
@@ -119,6 +130,83 @@ const parseHomeContent = (input: unknown, language: Language): CmsHomeContent | 
 
   if (typeof record.heroImage === "string" && record.heroImage.trim()) {
     output.heroImage = record.heroImage.trim();
+  }
+
+  if (Array.isArray(record.customBlocks)) {
+    const customBlocks = record.customBlocks
+      .map((entry, index): CmsHomeCustomBlock | null => {
+        if (!entry || typeof entry !== "object") {
+          return null;
+        }
+
+        const block = entry as Record<string, unknown>;
+        const type = block.type === "image" ? "image" : block.type === "text" ? "text" : null;
+        if (!type) {
+          return null;
+        }
+
+        const id =
+          typeof block.id === "string" && block.id.trim().length > 0
+            ? block.id.trim()
+            : `custom-block-${index + 1}`;
+
+        if (type === "text") {
+          const text = getLocalizedCmsText(block, "text", language, language !== "nl");
+          if (!text) {
+            return null;
+          }
+
+          const backgroundColor =
+            typeof block.backgroundColor === "string" && block.backgroundColor.trim()
+              ? block.backgroundColor.trim()
+              : undefined;
+          const backgroundShape =
+            block.backgroundShape === "pill"
+              ? "pill"
+              : block.backgroundShape === "rounded-square"
+                ? "rounded-square"
+                : undefined;
+
+          return {
+            id,
+            type,
+            text,
+            ...(backgroundColor ? { backgroundColor } : {}),
+            ...(backgroundShape ? { backgroundShape } : {}),
+          };
+        }
+
+        const imageUrl = typeof block.imageUrl === "string" ? block.imageUrl.trim() : "";
+        if (!imageUrl) {
+          return null;
+        }
+
+        const alt = getLocalizedCmsText(block, "alt", language, true);
+        const backgroundColor =
+          typeof block.backgroundColor === "string" && block.backgroundColor.trim()
+            ? block.backgroundColor.trim()
+            : undefined;
+        const backgroundShape =
+          block.backgroundShape === "pill"
+            ? "pill"
+            : block.backgroundShape === "rounded-square"
+              ? "rounded-square"
+              : undefined;
+
+        return {
+          id,
+          type,
+          imageUrl,
+          ...(alt ? { alt } : {}),
+          ...(backgroundColor ? { backgroundColor } : {}),
+          ...(backgroundShape ? { backgroundShape } : {}),
+        };
+      })
+      .filter((entry): entry is CmsHomeCustomBlock => entry !== null);
+
+    if (customBlocks.length > 0) {
+      output.customBlocks = customBlocks;
+    }
   }
 
   return Object.keys(output).length > 0 ? output : null;

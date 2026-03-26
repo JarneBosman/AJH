@@ -50,6 +50,12 @@ export default async function ShopPage() {
       />
 
       <div className="mt-7 flex flex-wrap gap-2">
+        <Link
+          href="/shop/all"
+          className="rounded-full border border-black/10 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-ink)] transition hover:border-[var(--color-wood)]"
+        >
+          {language === "nl" ? "Alle" : "All"}
+        </Link>
         {categories.map((category) => (
           <Link
             key={category.slug}

@@ -122,6 +122,22 @@ interface CmsHomeDraftState {
   storyPointTwoNl: string;
   storyPointThree: string;
   storyPointThreeNl: string;
+  customBlocks: CmsHomeContentBlockState[];
+}
+
+type CmsHomeContentBlockType = "text" | "image";
+type CmsHomeContentBlockShape = "rounded-square" | "pill";
+
+interface CmsHomeContentBlockState {
+  id: string;
+  type: CmsHomeContentBlockType;
+  text: string;
+  textNl: string;
+  imageUrl: string;
+  alt: string;
+  altNl: string;
+  backgroundColor: string;
+  backgroundShape: CmsHomeContentBlockShape;
 }
 
 interface CmsLinkRowState {
@@ -205,6 +221,8 @@ interface PreviewEditableValues {
   imageUrl: string;
   x: number;
   y: number;
+  width: number;
+  height: number;
 }
 
 interface PreviewEditHistoryEntry {
@@ -311,6 +329,21 @@ const createInitialCmsHomeDraftState = (): CmsHomeDraftState => ({
   storyPointTwoNl: "",
   storyPointThree: "",
   storyPointThreeNl: "",
+  customBlocks: [],
+});
+
+const createCmsHomeContentBlock = (
+  type: CmsHomeContentBlockType,
+): CmsHomeContentBlockState => ({
+  id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  type,
+  text: type === "text" ? "New text block" : "",
+  textNl: type === "text" ? "Nieuw tekstblok" : "",
+  imageUrl: "",
+  alt: "",
+  altNl: "",
+  backgroundColor: "#ffffff",
+  backgroundShape: "rounded-square",
 });
 
 const createInitialCmsGenericDraftState = (): CmsGenericDraftState => ({
@@ -337,6 +370,8 @@ const createInitialPreviewEditableValues = (): PreviewEditableValues => ({
   imageUrl: "",
   x: 0,
   y: 0,
+  width: 0,
+  height: 0,
 });
 
 interface DefaultSelectionRow {
@@ -443,6 +478,32 @@ const parseCmsHomeDraft = (value: unknown): CmsHomeDraftState => {
   }
 
   const source = value as Record<string, unknown>;
+  const rawBlocks = Array.isArray(source.customBlocks) ? source.customBlocks : [];
+  const customBlocks = rawBlocks
+    .map((entry): CmsHomeContentBlockState | null => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+
+      const block = entry as Record<string, unknown>;
+      const type = block.type === "image" ? "image" : block.type === "text" ? "text" : null;
+      if (!type) {
+        return null;
+      }
+
+      return {
+        id: asText(block.id) || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        type,
+        text: asText(block.text),
+        textNl: asText(block.textNl),
+        imageUrl: asText(block.imageUrl),
+        alt: asText(block.alt),
+        altNl: asText(block.altNl),
+        backgroundColor: asText(block.backgroundColor) || "#ffffff",
+        backgroundShape: block.backgroundShape === "pill" ? "pill" : "rounded-square",
+      };
+    })
+    .filter((entry): entry is CmsHomeContentBlockState => entry !== null);
 
   return {
     heroEyebrow: asText(source.heroEyebrow),
@@ -480,6 +541,7 @@ const parseCmsHomeDraft = (value: unknown): CmsHomeDraftState => {
     storyPointTwoNl: asText(source.storyPointTwoNl),
     storyPointThree: asText(source.storyPointThree),
     storyPointThreeNl: asText(source.storyPointThreeNl),
+    customBlocks,
   };
 };
 
@@ -615,6 +677,67 @@ const toColorInputValue = (value: string) => {
   return /^#([0-9a-fA-F]{6})$/.test(trimmed) ? trimmed : "#c9a97c";
 };
 
+const savedEditorColorsStorageKey = "cms-editor-saved-colors-v1";
+const maxSavedEditorColors = 12;
+
+const normalizeSavedEditorColor = (value: string) => toColorInputValue(value).toLowerCase();
+
+const isTransparentBackgroundColor = (value: string) => {
+  const trimmed = value.trim().toLowerCase();
+  return trimmed === "transparent" || trimmed === "rgba(0, 0, 0, 0)" || trimmed === "rgba(0,0,0,0)";
+};
+
+type PreviewShapeOption = "rounded-square" | "pill" | "custom";
+
+const parseRadiusToPx = (value: string): number | null => {
+  const trimmed = value.trim().toLowerCase();
+  const match = trimmed.match(/^(-?\d+(?:\.\d+)?)(px|rem)$/);
+  if (!match) {
+    return null;
+  }
+
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount)) {
+    return null;
+  }
+
+  if (match[2] === "rem") {
+    return amount * 16;
+  }
+
+  return amount;
+};
+
+const getPreviewShapeOption = (borderRadius: string): PreviewShapeOption => {
+  const trimmed = borderRadius.trim().toLowerCase();
+  if (!trimmed) {
+    return "custom";
+  }
+
+  if (trimmed === "9999px") {
+    return "pill";
+  }
+
+  if (trimmed === "1.5rem") {
+    return "rounded-square";
+  }
+
+  const radiusPx = parseRadiusToPx(trimmed);
+  if (radiusPx === null) {
+    return "custom";
+  }
+
+  if (radiusPx >= 999) {
+    return "pill";
+  }
+
+  if (Math.abs(radiusPx - 24) <= 1) {
+    return "rounded-square";
+  }
+
+  return "custom";
+};
+
 const createInitialProductState = (): NewProductState => ({
   name: "",
   nameNl: "",
@@ -650,6 +773,36 @@ const sanitizeFileName = (value: string) =>
     .toLowerCase()
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9._-]/g, "");
+
+const parseDecimalInput = (value: string): number | null => {
+  const normalized = value.trim().replace(/\s+/g, "").replace(",", ".");
+  if (!normalized) {
+    return null;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const formatAdminPrice = (value: number) =>
+  value.toLocaleString("nl-NL", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const toDecimalInputValue = (
+  value: number | string | null | undefined,
+  fallback = "",
+): string => {
+  const parsed =
+    typeof value === "number"
+      ? Number.isFinite(value)
+        ? value
+        : null
+      : parseDecimalInput(String(value ?? ""));
+
+  return parsed === null ? fallback : parsed.toString().replace(".", ",");
+};
 
 const createCmsDraftSnapshot = (
   homeDraft: CmsHomeDraftState,
@@ -689,19 +842,23 @@ export default function AdminPage() {
   const [newAppearanceSchemeName, setNewAppearanceSchemeName] = useState("");
   const [appearanceDrawerOpen, setAppearanceDrawerOpen] = useState(false);
   const [previewPath, setPreviewPath] = useState("/");
+  const [previewFrameVersion, setPreviewFrameVersion] = useState(0);
   const [previewFullscreen, setPreviewFullscreen] = useState(false);
   const [previewFullscreenInspectorOpen, setPreviewFullscreenInspectorOpen] = useState(true);
   const [previewFullscreenInspectorPosition, setPreviewFullscreenInspectorPosition] =
     useState<FullscreenInspectorPosition>({ left: 24, top: 72 });
   const [previewFullscreenInspectorSize, setPreviewFullscreenInspectorSize] =
     useState<FullscreenInspectorSize>({ width: 420, height: 560 });
+  const [homeBlocksMenuOpen, setHomeBlocksMenuOpen] = useState(false);
   const [visualEditorEnabled, setVisualEditorEnabled] = useState(false);
+  const [previewGridEnabled, setPreviewGridEnabled] = useState(false);
   const [selectedPreviewEditableId, setSelectedPreviewEditableId] = useState("");
   const [selectedPreviewCapabilities, setSelectedPreviewCapabilities] =
     useState<PreviewEditableCapabilities | null>(null);
   const [previewEditableValues, setPreviewEditableValues] = useState<PreviewEditableValues>(
     createInitialPreviewEditableValues,
   );
+  const [savedEditorColors, setSavedEditorColors] = useState<string[]>([]);
   const [previewUndoHistory, setPreviewUndoHistory] = useState<PreviewEditHistoryEntry[]>([]);
   const [previewRedoHistory, setPreviewRedoHistory] = useState<PreviewEditHistoryEntry[]>([]);
   const [appearanceError, setAppearanceError] = useState("");
@@ -745,6 +902,10 @@ export default function AdminPage() {
   const [cmsMediaUploadError, setCmsMediaUploadError] = useState("");
   const [isUploadingCmsMedia, setIsUploadingCmsMedia] = useState(false);
   const [isQuickImageUploading, setIsQuickImageUploading] = useState(false);
+  const [quickImageUploadFeedback, setQuickImageUploadFeedback] = useState("");
+  const [confirmDialogAction, setConfirmDialogAction] = useState<"discard" | "publish" | null>(null);
+  const [uploadingCustomBlockId, setUploadingCustomBlockId] = useState<string | null>(null);
+  const [customBlockUploadError, setCustomBlockUploadError] = useState("");
   const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
   const previewCommittedValuesRef = useRef<Map<string, PreviewEditableValues>>(new Map());
   const previewMoveHistoryDraftRef = useRef<
@@ -753,6 +914,8 @@ export default function AdminPage() {
         before: PreviewEditableValues;
         latestX: number;
         latestY: number;
+        latestWidth: number;
+        latestHeight: number;
       }
     | null
   >(null);
@@ -783,6 +946,9 @@ export default function AdminPage() {
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [managingCategories, setManagingCategories] = useState(false);
   const [categoryError, setCategoryError] = useState("");
+  const [isDraggingCategoryHero, setIsDraggingCategoryHero] = useState(false);
+  const [isUploadingCategoryHero, setIsUploadingCategoryHero] = useState(false);
+  const [categoryHeroUploadError, setCategoryHeroUploadError] = useState("");
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [categoryForm, setCategoryForm] = useState<NewCategoryState>(createInitialCategoryState);
   const [products, setProducts] = useState<ProductRow[]>([]);
@@ -805,21 +971,230 @@ export default function AdminPage() {
   const [isOwner, setIsOwner] = useState<boolean | null>(null);
   const [ownerCheckError, setOwnerCheckError] = useState("");
 
-  const handleDiscardCmsDraftChanges = useCallback(() => {
-    if (!cmsDraftSavedSnapshot) {
+  useEffect(() => {
+    if (typeof window === "undefined") {
       return;
     }
 
-    setCmsHomeDraft(cmsDraftSavedSnapshot.homeDraft);
-    setCmsSeoDraft(cmsDraftSavedSnapshot.seoDraft);
-    setCmsPageDrafts(cmsDraftSavedSnapshot.pageDrafts);
-    setCmsPageSeoDrafts(cmsDraftSavedSnapshot.pageSeoDrafts);
-    setCmsHeaderLinks(cmsDraftSavedSnapshot.headerLinks);
-    setCmsFooterLinks(cmsDraftSavedSnapshot.footerLinks);
-    setCmsDraftDirty(false);
+    try {
+      const raw = window.localStorage.getItem(savedEditorColorsStorageKey);
+      if (!raw) {
+        return;
+      }
+
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return;
+      }
+
+      const normalized = parsed
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => normalizeSavedEditorColor(value));
+
+      setSavedEditorColors(Array.from(new Set(normalized)).slice(0, maxSavedEditorColors));
+    } catch {
+      // Ignore invalid local storage payload.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(savedEditorColorsStorageKey, JSON.stringify(savedEditorColors));
+  }, [savedEditorColors]);
+
+  const saveEditorColor = useCallback((color: string) => {
+    const normalized = normalizeSavedEditorColor(color);
+    setSavedEditorColors((previous) =>
+      [normalized, ...previous.filter((entry) => entry !== normalized)].slice(0, maxSavedEditorColors),
+    );
+  }, []);
+
+  const addCmsHomeCustomBlock = useCallback((type: CmsHomeContentBlockType) => {
+    setPreviewPath("/");
+    setCmsHomeDraft((previous) => ({
+      ...previous,
+      customBlocks: [...previous.customBlocks, createCmsHomeContentBlock(type)],
+    }));
+  }, []);
+
+  const removeCmsHomeCustomBlock = useCallback((id: string) => {
+    setPreviewPath("/");
+    setCmsHomeDraft((previous) => ({
+      ...previous,
+      customBlocks: previous.customBlocks.filter((block) => block.id !== id),
+    }));
+  }, []);
+
+  const updateCmsHomeCustomBlock = useCallback(
+    (id: string, key: keyof Omit<CmsHomeContentBlockState, "id" | "type">, value: string) => {
+      setPreviewPath("/");
+      setCmsHomeDraft((previous) => ({
+        ...previous,
+        customBlocks: previous.customBlocks.map((block) =>
+          block.id === id
+            ? {
+                ...block,
+                [key]: value,
+              }
+            : block,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const handleCustomBlockImageUpload = useCallback(
+    async (blockId: string, file: File) => {
+      if (!session) {
+        setCustomBlockUploadError("Please sign in before uploading media.");
+        return;
+      }
+
+      if (!file.type.startsWith("image/")) {
+        setCustomBlockUploadError("Only image files can be uploaded.");
+        return;
+      }
+
+      setPreviewPath("/");
+      setCustomBlockUploadError("");
+      setUploadingCustomBlockId(blockId);
+
+      try {
+        const extension = file.name.includes(".") ? file.name.split(".").pop() : "jpg";
+        const baseName = sanitizeFileName(file.name.replace(/\.[^.]+$/, ""));
+        const uniquePath = `cms/${Date.now()}-${Math.random().toString(16).slice(2)}-${baseName || "asset"}.${extension}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from(cmsMediaBucket)
+          .upload(uniquePath, file, { upsert: false });
+
+        if (uploadError) {
+          setCustomBlockUploadError(uploadError.message);
+          return;
+        }
+
+        const insertPayload: Record<string, unknown> = {
+          bucket: cmsMediaBucket,
+          storage_path: uniquePath,
+          mime_type: file.type || null,
+          size_bytes: file.size,
+          created_by: session.user.id,
+        };
+
+        let { error: insertError } = await (supabase as any).from("cms_media_assets").insert(insertPayload);
+
+        if (
+          insertError &&
+          /created_by/i.test(insertError.message) &&
+          /(column|field).*does not exist/i.test(insertError.message)
+        ) {
+          const { created_by, ...legacyInsertPayload } = insertPayload;
+          const fallbackInsert = await (supabase as any)
+            .from("cms_media_assets")
+            .insert(legacyInsertPayload);
+          insertError = fallbackInsert.error;
+        }
+
+        if (insertError) {
+          setCustomBlockUploadError(insertError.message);
+          return;
+        }
+
+        const publicUrl = supabase.storage.from(cmsMediaBucket).getPublicUrl(uniquePath).data.publicUrl;
+        updateCmsHomeCustomBlock(blockId, "imageUrl", publicUrl);
+      } catch {
+        setCustomBlockUploadError("Image upload failed unexpectedly.");
+      } finally {
+        setUploadingCustomBlockId(null);
+      }
+    },
+    [session, supabase, updateCmsHomeCustomBlock],
+  );
+
+  const handleDiscardCmsDraftChanges = useCallback((skipConfirm = false) => {
+    const hasPreviewEdits = previewUndoHistory.length > 0 || previewRedoHistory.length > 0;
+
+    if (!cmsDraftSavedSnapshot && !hasPreviewEdits) {
+      return;
+    }
+
+    if (!skipConfirm) {
+      setConfirmDialogAction("discard");
+      return;
+    }
+
+    if (cmsDraftSavedSnapshot) {
+      setCmsHomeDraft(cmsDraftSavedSnapshot.homeDraft);
+      setCmsSeoDraft(cmsDraftSavedSnapshot.seoDraft);
+      setCmsPageDrafts(cmsDraftSavedSnapshot.pageDrafts);
+      setCmsPageSeoDrafts(cmsDraftSavedSnapshot.pageSeoDrafts);
+      setCmsHeaderLinks(cmsDraftSavedSnapshot.headerLinks);
+      setCmsFooterLinks(cmsDraftSavedSnapshot.footerLinks);
+      setCmsDraftDirty(false);
+    }
+
+    if (previewMoveHistoryTimerRef.current !== null) {
+      window.clearTimeout(previewMoveHistoryTimerRef.current);
+      previewMoveHistoryTimerRef.current = null;
+    }
+
+    previewMoveHistoryDraftRef.current = null;
+
+    if (hasPreviewEdits) {
+      const revertSnapshots = new Map<string, PreviewEditableValues>();
+
+      for (const entry of previewUndoHistory) {
+        if (!revertSnapshots.has(entry.id)) {
+          revertSnapshots.set(entry.id, entry.before);
+        }
+      }
+
+      for (const [id, values] of revertSnapshots.entries()) {
+        if (previewIframeRef.current?.contentWindow) {
+          previewIframeRef.current.contentWindow.postMessage(
+            {
+              type: "cms-preview:editor:apply",
+              payload: {
+                id,
+                changes: {
+                  text: values.text,
+                  color: values.color,
+                  fontFamily: values.fontFamily,
+                  fontSize: values.fontSize,
+                  fontWeight: values.fontWeight,
+                  backgroundColor: values.backgroundColor,
+                  borderRadius: values.borderRadius,
+                  imageUrl: values.imageUrl,
+                  x: values.x,
+                  y: values.y,
+                  width: values.width,
+                  height: values.height,
+                },
+              },
+            },
+            window.location.origin,
+          );
+        }
+      }
+    }
+
+    previewCommittedValuesRef.current.clear();
+    setPreviewUndoHistory([]);
+    setPreviewRedoHistory([]);
+    setSelectedPreviewEditableId("");
+    setSelectedPreviewCapabilities(null);
+    setPreviewEditableValues(createInitialPreviewEditableValues());
+    setPreviewFrameVersion((version) => version + 1);
+
     setCmsError("");
     setCmsSuccess("Discarded unsaved changes and restored the last saved draft.");
-  }, [cmsDraftSavedSnapshot]);
+  }, [cmsDraftSavedSnapshot, previewRedoHistory, previewUndoHistory]);
+
+  const canDiscardCmsChanges =
+    cmsDraftDirty || previewUndoHistory.length > 0 || previewRedoHistory.length > 0;
   const [slugEdited, setSlugEdited] = useState(false);
   const router = useRouter();
   const cmsEditableBindingMap = useMemo(
@@ -1521,6 +1896,9 @@ export default function AdminPage() {
         ),
       );
       setCmsDraftDirty(false);
+      previewCommittedValuesRef.current.clear();
+      setPreviewUndoHistory([]);
+      setPreviewRedoHistory([]);
 
       setCmsMediaAssets((mediaData ?? []) as CmsMediaAssetRow[]);
     } catch {
@@ -1605,6 +1983,9 @@ export default function AdminPage() {
         ),
       );
       setCmsDraftDirty(false);
+      previewCommittedValuesRef.current.clear();
+      setPreviewUndoHistory([]);
+      setPreviewRedoHistory([]);
       setCmsSuccess("CMS draft saved.");
     } catch {
       setCmsError("Failed to save CMS draft.");
@@ -1625,7 +2006,13 @@ export default function AdminPage() {
     supabase,
   ]);
 
-  const handlePublishCms = useCallback(async () => {
+  const handlePublishCms = useCallback(async (skipConfirm = false) => {
+
+    if (!skipConfirm) {
+      setConfirmDialogAction("publish");
+      return;
+    }
+
     try {
       setPublishingCms(true);
       setCmsError("");
@@ -1719,6 +2106,9 @@ export default function AdminPage() {
         ),
       );
       setCmsDraftDirty(false);
+      previewCommittedValuesRef.current.clear();
+      setPreviewUndoHistory([]);
+      setPreviewRedoHistory([]);
       setCmsSuccess("CMS content published.");
     } catch {
       setCmsError("Failed to publish CMS content.");
@@ -1822,13 +2212,28 @@ export default function AdminPage() {
             continue;
           }
 
-          const { error: insertError } = await (supabase as any).from("cms_media_assets").insert({
+          const insertPayload: Record<string, unknown> = {
             bucket: cmsMediaBucket,
             storage_path: uniquePath,
             mime_type: file.type || null,
             size_bytes: file.size,
             created_by: session.user.id,
-          });
+          };
+
+          let { error: insertError } = await (supabase as any).from("cms_media_assets").insert(insertPayload);
+
+          // Older databases may not have the created_by column yet.
+          if (
+            insertError &&
+            /created_by/i.test(insertError.message) &&
+            /(column|field).*does not exist/i.test(insertError.message)
+          ) {
+            const { created_by, ...legacyInsertPayload } = insertPayload;
+            const fallbackInsert = await (supabase as any)
+              .from("cms_media_assets")
+              .insert(legacyInsertPayload);
+            insertError = fallbackInsert.error;
+          }
 
           if (insertError) {
             uploadErrors.push(`${file.name}: ${insertError.message}`);
@@ -1963,6 +2368,20 @@ export default function AdminPage() {
     );
   }, [visualEditorEnabled]);
 
+  const postPreviewGridToggle = useCallback(() => {
+    if (!previewIframeRef.current?.contentWindow) {
+      return;
+    }
+
+    previewIframeRef.current.contentWindow.postMessage(
+      {
+        type: "cms-preview:editor:grid-toggle",
+        payload: { enabled: previewGridEnabled },
+      },
+      window.location.origin,
+    );
+  }, [previewGridEnabled]);
+
   const applyPreviewEditableChanges = useCallback(
     (
       changes: Partial<{
@@ -1976,6 +2395,8 @@ export default function AdminPage() {
         imageUrl: string;
         x: number;
         y: number;
+        width: number;
+        height: number;
       }>,
       options?: {
         skipHistory?: boolean;
@@ -2058,6 +2479,8 @@ export default function AdminPage() {
         imageUrl: previousEntry.before.imageUrl,
         x: previousEntry.before.x,
         y: previousEntry.before.y,
+        width: previousEntry.before.width,
+        height: previousEntry.before.height,
       },
       {
         skipHistory: true,
@@ -2093,6 +2516,8 @@ export default function AdminPage() {
         imageUrl: nextEntry.after.imageUrl,
         x: nextEntry.after.x,
         y: nextEntry.after.y,
+        width: nextEntry.after.width,
+        height: nextEntry.after.height,
       },
       {
         skipHistory: true,
@@ -2103,17 +2528,22 @@ export default function AdminPage() {
 
   const handleQuickEditorImageUpload = useCallback(
     async (file: File) => {
+      setQuickImageUploadFeedback(`Selected: ${file.name}`);
+
       if (!session) {
         setCmsMediaUploadError("Please sign in before uploading media.");
+        setQuickImageUploadFeedback("Upload failed: please sign in before uploading media.");
         return;
       }
 
       if (!file.type.startsWith("image/")) {
         setCmsMediaUploadError("Only image files can be uploaded in Quick Editor.");
+        setQuickImageUploadFeedback("Upload failed: only image files are allowed.");
         return;
       }
 
       setCmsMediaUploadError("");
+      setQuickImageUploadFeedback(`Uploading ${file.name}...`);
       setIsQuickImageUploading(true);
 
       try {
@@ -2127,19 +2557,36 @@ export default function AdminPage() {
 
         if (uploadError) {
           setCmsMediaUploadError(uploadError.message);
+          setQuickImageUploadFeedback(`Upload failed: ${uploadError.message}`);
           return;
         }
 
-        const { error: insertError } = await (supabase as any).from("cms_media_assets").insert({
+        const insertPayload: Record<string, unknown> = {
           bucket: cmsMediaBucket,
           storage_path: uniquePath,
           mime_type: file.type || null,
           size_bytes: file.size,
           created_by: session.user.id,
-        });
+        };
+
+        let { error: insertError } = await (supabase as any).from("cms_media_assets").insert(insertPayload);
+
+        // Older databases may not have the created_by column yet.
+        if (
+          insertError &&
+          /created_by/i.test(insertError.message) &&
+          /(column|field).*does not exist/i.test(insertError.message)
+        ) {
+          const { created_by, ...legacyInsertPayload } = insertPayload;
+          const fallbackInsert = await (supabase as any)
+            .from("cms_media_assets")
+            .insert(legacyInsertPayload);
+          insertError = fallbackInsert.error;
+        }
 
         if (insertError) {
           setCmsMediaUploadError(insertError.message);
+          setQuickImageUploadFeedback(`Upload failed: ${insertError.message}`);
           return;
         }
 
@@ -2156,6 +2603,11 @@ export default function AdminPage() {
         }
 
         await fetchCmsWorkspace();
+        setQuickImageUploadFeedback("Upload complete: image replaced successfully.");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Image upload failed unexpectedly.";
+        setCmsMediaUploadError(message);
+        setQuickImageUploadFeedback(`Upload failed: ${message}`);
       } finally {
         setIsQuickImageUploading(false);
       }
@@ -2279,7 +2731,33 @@ export default function AdminPage() {
       },
       window.location.origin,
     );
-  }, [appearanceForm, visualEditorEnabled]);
+
+    previewIframeRef.current.contentWindow.postMessage(
+      {
+        type: "cms-preview:editor:grid-toggle",
+        payload: { enabled: previewGridEnabled },
+      },
+      window.location.origin,
+    );
+
+    previewIframeRef.current.contentWindow.postMessage(
+      {
+        type: "cms-preview:home-custom-blocks",
+        payload: {
+          blocks: cmsHomeDraft.customBlocks.map((block) => ({
+            id: block.id,
+            type: block.type,
+            text: block.text,
+            imageUrl: block.imageUrl,
+            alt: block.alt,
+            backgroundColor: block.backgroundColor,
+            backgroundShape: block.backgroundShape,
+          })),
+        },
+      },
+      window.location.origin,
+    );
+  }, [appearanceForm, cmsHomeDraft.customBlocks, previewGridEnabled, visualEditorEnabled]);
 
   useEffect(() => {
     if (activeAdminTab === "appearance") {
@@ -2290,6 +2768,10 @@ export default function AdminPage() {
   useEffect(() => {
     postPreviewEditorToggle();
   }, [postPreviewEditorToggle]);
+
+  useEffect(() => {
+    postPreviewGridToggle();
+  }, [postPreviewGridToggle]);
 
   useEffect(() => {
     if (!visualEditorEnabled || !selectedPreviewEditableId || !previewIframeRef.current?.contentWindow) {
@@ -2319,6 +2801,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!previewFullscreen) {
+      setHomeBlocksMenuOpen(false);
       return;
     }
 
@@ -2451,6 +2934,8 @@ export default function AdminPage() {
               id: string;
               x: number;
               y: number;
+              width?: number;
+              height?: number;
             };
           };
 
@@ -2475,10 +2960,16 @@ export default function AdminPage() {
             before: { ...committed },
             latestX: message.payload.x,
             latestY: message.payload.y,
+            latestWidth: message.payload.width ?? committed.width,
+            latestHeight: message.payload.height ?? committed.height,
           };
         } else {
           previewMoveHistoryDraftRef.current.latestX = message.payload.x;
           previewMoveHistoryDraftRef.current.latestY = message.payload.y;
+          previewMoveHistoryDraftRef.current.latestWidth =
+            message.payload.width ?? previewMoveHistoryDraftRef.current.latestWidth;
+          previewMoveHistoryDraftRef.current.latestHeight =
+            message.payload.height ?? previewMoveHistoryDraftRef.current.latestHeight;
         }
 
         if (previewMoveHistoryTimerRef.current !== null) {
@@ -2495,11 +2986,15 @@ export default function AdminPage() {
             ...draft.before,
             x: draft.latestX,
             y: draft.latestY,
+            width: draft.latestWidth,
+            height: draft.latestHeight,
           };
 
           if (
             draft.before.x !== afterSnapshot.x ||
-            draft.before.y !== afterSnapshot.y
+            draft.before.y !== afterSnapshot.y ||
+            draft.before.width !== afterSnapshot.width ||
+            draft.before.height !== afterSnapshot.height
           ) {
             setPreviewUndoHistory((previousHistory) => {
               const nextHistory = [
@@ -2524,6 +3019,8 @@ export default function AdminPage() {
           ...previous,
           x: message.payload.x,
           y: message.payload.y,
+          width: message.payload.width ?? previous.width,
+          height: message.payload.height ?? previous.height,
         }));
       }
     };
@@ -2671,6 +3168,7 @@ export default function AdminPage() {
   const handleEditCategory = (category: CategoryRow) => {
     setEditingCategoryId(category.id);
     setCategoryError("");
+    setCategoryHeroUploadError("");
     setCategoryForm({
       name: category.name,
       nameNl: category.name_nl ?? "",
@@ -2684,7 +3182,69 @@ export default function AdminPage() {
   const handleCancelCategoryEdit = () => {
     setEditingCategoryId(null);
     setCategoryError("");
+    setCategoryHeroUploadError("");
     setCategoryForm(createInitialCategoryState());
+  };
+
+  const handleCategoryHeroFile = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setCategoryHeroUploadError("Please drop an image file (JPG, PNG, WEBP, or GIF).");
+      return;
+    }
+
+    setCategoryHeroUploadError("");
+    setIsUploadingCategoryHero(true);
+
+    try {
+      const extension = file.name.includes(".") ? file.name.split(".").pop() : "jpg";
+      const fileName = sanitizeFileName(file.name.replace(/\.[^.]+$/, ""));
+      const uniquePath = `categories/${Date.now()}-${Math.random().toString(16).slice(2)}-${fileName || "hero"}.${extension}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(productImageBucket)
+        .upload(uniquePath, file, { upsert: false });
+
+      if (uploadError) {
+        setCategoryHeroUploadError(`${uploadError.message} (Bucket: "${productImageBucket}")`);
+        return;
+      }
+
+      const { data: publicData } = supabase.storage
+        .from(productImageBucket)
+        .getPublicUrl(uniquePath);
+
+      if (!publicData?.publicUrl) {
+        setCategoryHeroUploadError("Image uploaded, but no public URL was returned.");
+        return;
+      }
+
+      setCategoryForm((previous) => ({
+        ...previous,
+        heroImage: publicData.publicUrl,
+      }));
+    } finally {
+      setIsUploadingCategoryHero(false);
+    }
+  };
+
+  const handleCategoryHeroInputChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      await handleCategoryHeroFile(file);
+    }
+    event.target.value = "";
+  };
+
+  const handleCategoryHeroDrop = async (event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    setIsDraggingCategoryHero(false);
+
+    const file = event.dataTransfer.files?.[0];
+    if (file) {
+      await handleCategoryHeroFile(file);
+    }
   };
 
   useEffect(() => {
@@ -2876,7 +3436,12 @@ export default function AdminPage() {
             id: typeof choice.id === "string" ? choice.id : "",
             label: typeof choice.label === "string" ? choice.label : "",
             labelNl: typeof choice.labelNl === "string" ? choice.labelNl : "",
-            priceModifier: String(Number(choice.priceModifier ?? 0)),
+            priceModifier: toDecimalInputValue(
+              typeof choice.priceModifier === "number" || typeof choice.priceModifier === "string"
+                ? choice.priceModifier
+                : null,
+              "0",
+            ),
             swatchHex: typeof choice.swatchHex === "string" ? choice.swatchHex : "",
           }))
           .filter((choice) => choice.id || choice.label);
@@ -2900,7 +3465,7 @@ export default function AdminPage() {
       nameNl: product.name_nl ?? "",
       slug: product.slug,
       category: normalizedCategory,
-      basePrice: String(product.base_price),
+      basePrice: toDecimalInputValue(product.base_price),
       subtitle: product.subtitle,
       subtitleNl: product.subtitle_nl ?? "",
       description: product.description,
@@ -3101,9 +3666,9 @@ export default function AdminPage() {
       return;
     }
 
-    const basePriceNumber = Number(productForm.basePrice);
-    if (!Number.isFinite(basePriceNumber) || basePriceNumber <= 0) {
-      setCreateError("Base price must be a valid number greater than 0.");
+    const basePriceNumber = parseDecimalInput(productForm.basePrice);
+    if (basePriceNumber === null || basePriceNumber <= 0) {
+      setCreateError("Base price must be a valid number greater than 0 (e.g. 1499,50).");
       setCreateSuccess("");
       return;
     }
@@ -3191,7 +3756,7 @@ export default function AdminPage() {
             id: choiceId,
             label: choiceLabel,
             ...(choiceLabelNl ? { labelNl: choiceLabelNl } : {}),
-            priceModifier: Number(choice.priceModifier || 0),
+            priceModifier: parseDecimalInput(choice.priceModifier) ?? 0,
             ...(choice.swatchHex.trim() ? { swatchHex: choice.swatchHex.trim() } : {}),
           };
         })
@@ -3444,8 +4009,8 @@ export default function AdminPage() {
                   <Button
                     type="button"
                     variant="ghost"
-                    onClick={handleDiscardCmsDraftChanges}
-                    disabled={!cmsDraftDirty || loadingCms || savingCmsDraft || publishingCms}
+                    onClick={() => void handleDiscardCmsDraftChanges()}
+                    disabled={!canDiscardCmsChanges || loadingCms || savingCmsDraft || publishingCms}
                   >
                     Discard Changes
                   </Button>
@@ -3587,16 +4152,40 @@ export default function AdminPage() {
                         <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
                           Text color
                         </label>
-                        <input
-                          type="color"
-                          className={fieldClassName}
-                          value={toColorInputValue(previewEditableValues.color)}
-                          onChange={(event) => {
-                            const value = event.target.value;
-                            setPreviewEditableValues((previous) => ({ ...previous, color: value }));
-                            applyPreviewEditableChanges({ color: value });
-                          }}
-                        />
+                        <div className="mt-1 flex items-center gap-2">
+                          <input
+                            type="color"
+                            className="h-10 w-14 rounded-xl border border-black/10 bg-white p-1"
+                            value={toColorInputValue(previewEditableValues.color)}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              setPreviewEditableValues((previous) => ({ ...previous, color: value }));
+                              applyPreviewEditableChanges({ color: value });
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="rounded-xl border border-black/10 bg-white px-2.5 py-1.5 text-xs font-medium text-[var(--color-ink)]"
+                            onClick={() => saveEditorColor(previewEditableValues.color)}
+                          >
+                            Save
+                          </button>
+                          <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+                            {savedEditorColors.map((savedColor) => (
+                              <button
+                                key={`quick-text-${savedColor}`}
+                                type="button"
+                                title={savedColor}
+                                className="h-6 w-6 rounded-md border border-black/15"
+                                style={{ backgroundColor: savedColor }}
+                                onClick={() => {
+                                  setPreviewEditableValues((previous) => ({ ...previous, color: savedColor }));
+                                  applyPreviewEditableChanges({ color: savedColor });
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     ) : null}
 
@@ -3605,16 +4194,61 @@ export default function AdminPage() {
                         <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
                           Background color
                         </label>
-                        <input
-                          type="color"
-                          className={fieldClassName}
-                          value={toColorInputValue(previewEditableValues.backgroundColor)}
-                          onChange={(event) => {
-                            const value = event.target.value;
-                            setPreviewEditableValues((previous) => ({ ...previous, backgroundColor: value }));
-                            applyPreviewEditableChanges({ backgroundColor: value });
-                          }}
-                        />
+                        <div className="mt-1 flex items-center gap-2">
+                          <input
+                            type="color"
+                            className="h-10 w-14 rounded-xl border border-black/10 bg-white p-1"
+                            value={toColorInputValue(
+                              isTransparentBackgroundColor(previewEditableValues.backgroundColor)
+                                ? "#ffffff"
+                                : previewEditableValues.backgroundColor,
+                            )}
+                            disabled={isTransparentBackgroundColor(previewEditableValues.backgroundColor)}
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              setPreviewEditableValues((previous) => ({ ...previous, backgroundColor: value }));
+                              applyPreviewEditableChanges({ backgroundColor: value });
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="rounded-xl border border-black/10 bg-white px-2.5 py-1.5 text-xs font-medium text-[var(--color-ink)]"
+                            onClick={() => saveEditorColor(previewEditableValues.backgroundColor)}
+                            disabled={isTransparentBackgroundColor(previewEditableValues.backgroundColor)}
+                          >
+                            Save
+                          </button>
+                          <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+                            {savedEditorColors.map((savedColor) => (
+                              <button
+                                key={`quick-bg-${savedColor}`}
+                                type="button"
+                                title={savedColor}
+                                className="h-6 w-6 rounded-md border border-black/15"
+                                style={{ backgroundColor: savedColor }}
+                                onClick={() => {
+                                  setPreviewEditableValues((previous) => ({
+                                    ...previous,
+                                    backgroundColor: savedColor,
+                                  }));
+                                  applyPreviewEditableChanges({ backgroundColor: savedColor });
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <label className="mt-2 flex items-center gap-2 text-xs text-[var(--color-muted)]">
+                          <input
+                            type="checkbox"
+                            checked={isTransparentBackgroundColor(previewEditableValues.backgroundColor)}
+                            onChange={(event) => {
+                              const value = event.target.checked ? "transparent" : "#ffffff";
+                              setPreviewEditableValues((previous) => ({ ...previous, backgroundColor: value }));
+                              applyPreviewEditableChanges({ backgroundColor: value });
+                            }}
+                          />
+                          Invisible background
+                        </label>
                       </div>
                     ) : null}
 
@@ -3745,6 +4379,254 @@ export default function AdminPage() {
             </div>
 
             <div className="mt-6 space-y-5 rounded-2xl border border-black/10 bg-[var(--color-neutral-100)]/55 p-5">
+              <div className="rounded-2xl border border-black/10 bg-white p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-[var(--color-ink)]">Home Custom Blocks</h3>
+                    <p className="text-sm text-[var(--color-muted)]">
+                      Add and remove optional text and image blocks on the homepage.
+                    </p>
+                  </div>
+                  {!previewFullscreen ? (
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="secondary" onClick={() => addCmsHomeCustomBlock("text")}>
+                        Add Text Block
+                      </Button>
+                      <Button type="button" variant="secondary" onClick={() => addCmsHomeCustomBlock("image")}>
+                        Add Image Block
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+
+                {cmsHomeDraft.customBlocks.length === 0 ? (
+                  <p className="mt-4 rounded-xl border border-dashed border-black/20 px-4 py-3 text-sm text-[var(--color-muted)]">
+                    No custom blocks yet.
+                  </p>
+                ) : (
+                  <div className="mt-4 space-y-3">
+                    {cmsHomeDraft.customBlocks.map((block, index) => (
+                      <div key={block.id} className="rounded-xl border border-black/10 bg-[var(--color-neutral-100)]/50 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)]">
+                            Block {index + 1}: {block.type}
+                          </p>
+                          <Button type="button" variant="ghost" onClick={() => removeCmsHomeCustomBlock(block.id)}>
+                            Remove
+                          </Button>
+                        </div>
+
+                        {block.type === "text" ? (
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            <div>
+                              <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                                Text EN
+                              </label>
+                              <textarea
+                                className={fieldClassName}
+                                rows={3}
+                                value={block.text}
+                                onChange={(event) =>
+                                  updateCmsHomeCustomBlock(block.id, "text", event.target.value)
+                                }
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                                Text NL
+                              </label>
+                              <textarea
+                                className={fieldClassName}
+                                rows={3}
+                                value={block.textNl}
+                                onChange={(event) =>
+                                  updateCmsHomeCustomBlock(block.id, "textNl", event.target.value)
+                                }
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                                Background Color
+                              </label>
+                              <input
+                                type="color"
+                                className={`${fieldClassName} h-12`}
+                                value={
+                                  block.backgroundColor === "transparent"
+                                    ? "#ffffff"
+                                    : block.backgroundColor || "#ffffff"
+                                }
+                                disabled={block.backgroundColor === "transparent"}
+                                onChange={(event) =>
+                                  updateCmsHomeCustomBlock(block.id, "backgroundColor", event.target.value)
+                                }
+                              />
+                              <label className="mt-2 flex items-center gap-2 text-xs text-[var(--color-muted)]">
+                                <input
+                                  type="checkbox"
+                                  checked={block.backgroundColor === "transparent"}
+                                  onChange={(event) =>
+                                    updateCmsHomeCustomBlock(
+                                      block.id,
+                                      "backgroundColor",
+                                      event.target.checked ? "transparent" : "#ffffff",
+                                    )
+                                  }
+                                />
+                                Invisible background
+                              </label>
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                                Background Shape
+                              </label>
+                              <select
+                                className={fieldClassName}
+                                value={block.backgroundShape}
+                                onChange={(event) =>
+                                  updateCmsHomeCustomBlock(block.id, "backgroundShape", event.target.value)
+                                }
+                              >
+                                <option value="rounded-square">Rounded Square</option>
+                                <option value="pill">Pill</option>
+                              </select>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            <div
+                              className="md:col-span-2 rounded-xl border border-dashed border-black/20 bg-white px-4 py-4 text-center text-xs text-[var(--color-muted)]"
+                              onDragOver={(event) => {
+                                event.preventDefault();
+                                event.dataTransfer.dropEffect = "copy";
+                              }}
+                              onDrop={(event) => {
+                                event.preventDefault();
+                                const file = event.dataTransfer.files?.[0];
+                                if (file) {
+                                  void handleCustomBlockImageUpload(block.id, file);
+                                }
+                              }}
+                            >
+                              <p className="font-semibold text-[var(--color-ink)]">
+                                Drag and drop an image here
+                              </p>
+                              <p className="mt-1">or click to upload</p>
+                              <label className="mt-3 inline-flex cursor-pointer items-center rounded-xl border border-black/10 bg-[var(--color-neutral-100)] px-3 py-2 text-xs font-medium text-[var(--color-ink)]">
+                                Upload image
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(event) => {
+                                    const file = event.target.files?.[0];
+                                    if (file) {
+                                      void handleCustomBlockImageUpload(block.id, file);
+                                    }
+                                    event.target.value = "";
+                                  }}
+                                />
+                              </label>
+                              {uploadingCustomBlockId === block.id ? (
+                                <p className="mt-2 text-xs text-[var(--color-muted)]">Uploading image...</p>
+                              ) : null}
+                              {customBlockUploadError ? (
+                                <p className="mt-2 text-xs text-red-600">{customBlockUploadError}</p>
+                              ) : null}
+                            </div>
+
+                            <div className="md:col-span-2">
+                              <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                                Image URL
+                              </label>
+                              <input
+                                className={fieldClassName}
+                                value={block.imageUrl}
+                                onChange={(event) =>
+                                  updateCmsHomeCustomBlock(block.id, "imageUrl", event.target.value)
+                                }
+                                placeholder="https://..."
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                                Alt EN
+                              </label>
+                              <input
+                                className={fieldClassName}
+                                value={block.alt}
+                                onChange={(event) =>
+                                  updateCmsHomeCustomBlock(block.id, "alt", event.target.value)
+                                }
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                                Alt NL
+                              </label>
+                              <input
+                                className={fieldClassName}
+                                value={block.altNl}
+                                onChange={(event) =>
+                                  updateCmsHomeCustomBlock(block.id, "altNl", event.target.value)
+                                }
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                                Background Color
+                              </label>
+                              <input
+                                type="color"
+                                className={`${fieldClassName} h-12`}
+                                value={
+                                  block.backgroundColor === "transparent"
+                                    ? "#ffffff"
+                                    : block.backgroundColor || "#ffffff"
+                                }
+                                disabled={block.backgroundColor === "transparent"}
+                                onChange={(event) =>
+                                  updateCmsHomeCustomBlock(block.id, "backgroundColor", event.target.value)
+                                }
+                              />
+                              <label className="mt-2 flex items-center gap-2 text-xs text-[var(--color-muted)]">
+                                <input
+                                  type="checkbox"
+                                  checked={block.backgroundColor === "transparent"}
+                                  onChange={(event) =>
+                                    updateCmsHomeCustomBlock(
+                                      block.id,
+                                      "backgroundColor",
+                                      event.target.checked ? "transparent" : "#ffffff",
+                                    )
+                                  }
+                                />
+                                Invisible background
+                              </label>
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                                Background Shape
+                              </label>
+                              <select
+                                className={fieldClassName}
+                                value={block.backgroundShape}
+                                onChange={(event) =>
+                                  updateCmsHomeCustomBlock(block.id, "backgroundShape", event.target.value)
+                                }
+                              >
+                                <option value="rounded-square">Rounded Square</option>
+                                <option value="pill">Pill</option>
+                              </select>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h3 className="text-lg font-semibold text-[var(--color-ink)]">Global Editor</h3>
@@ -3972,10 +4854,85 @@ export default function AdminPage() {
             >
               {previewFullscreen ? (
                 <div className="flex items-center justify-between border-b border-black/10 bg-white px-4 py-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)]">
-                    Fullscreen Editor
-                  </p>
-                  <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)] leading-[1.05]">
+                    <span className="block">Fullscreen</span>
+                    <span className="block">Editor</span>
+                  </span>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <div className="relative">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="h-10 w-10 px-0 py-0"
+                        onClick={() => setHomeBlocksMenuOpen((previous) => !previous)}
+                        aria-label="Open block actions"
+                        title="Add Blocks"
+                      >
+                        <span aria-hidden="true" className="flex h-4 w-4 flex-col items-center justify-center gap-0.5">
+                          <span className="block h-0.5 w-4 rounded-full bg-current" />
+                          <span className="block h-0.5 w-4 rounded-full bg-current" />
+                          <span className="block h-0.5 w-4 rounded-full bg-current" />
+                        </span>
+                      </Button>
+
+                      <div
+                        className={`absolute left-0 z-[90] mt-2 w-20 origin-top overflow-hidden rounded-lg border border-black/10 bg-[var(--color-neutral-100)]/95 shadow-[0_20px_40px_-24px_rgba(0,0,0,0.45)] backdrop-blur transition duration-200 ${
+                          homeBlocksMenuOpen
+                            ? "pointer-events-auto translate-y-0 opacity-100"
+                            : "pointer-events-none -translate-y-1 opacity-0"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          className={`w-full border-b border-black/10 px-2 py-1.5 text-left text-[9px] font-semibold uppercase tracking-[0.09em] transition ${
+                            visualEditorEnabled
+                              ? "bg-[var(--color-wood-dark)] text-white hover:bg-[var(--color-wood)]"
+                              : "bg-transparent text-[var(--color-ink)] hover:bg-white/70"
+                          }`}
+                          title={visualEditorEnabled ? "Disable selection overlay" : "Enable selection overlay"}
+                          onClick={() => {
+                            setVisualEditorEnabled((previous) => !previous);
+                          }}
+                        >
+                          Select
+                        </button>
+                        <button
+                          type="button"
+                          className={`w-full border-b border-black/10 px-2 py-1.5 text-left text-[9px] font-semibold uppercase tracking-[0.09em] transition ${
+                            previewGridEnabled
+                              ? "bg-[var(--color-wood-dark)] text-white hover:bg-[var(--color-wood)]"
+                              : "bg-transparent text-[var(--color-ink)] hover:bg-white/70"
+                          }`}
+                          title={previewGridEnabled ? "Disable grid snap" : "Enable grid snap"}
+                          onClick={() => {
+                            setPreviewGridEnabled((previous) => !previous);
+                          }}
+                        >
+                          Grid
+                        </button>
+                        <button
+                          type="button"
+                          className="w-full border-b border-black/10 px-2 py-1.5 text-left text-[9px] font-semibold uppercase tracking-[0.09em] text-[var(--color-ink)] transition hover:bg-white/70"
+                          title="Add text block"
+                          onClick={() => {
+                            addCmsHomeCustomBlock("text");
+                          }}
+                        >
+                          TXT +
+                        </button>
+                        <button
+                          type="button"
+                          className="w-full px-2 py-1.5 text-left text-[9px] font-semibold uppercase tracking-[0.09em] text-[var(--color-ink)] transition hover:bg-white/70"
+                          title="Add image block"
+                          onClick={() => {
+                            addCmsHomeCustomBlock("image");
+                          }}
+                        >
+                          IMG +
+                        </button>
+                      </div>
+                    </div>
+
                     <span
                       className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${
                         cmsDraftDirty
@@ -4031,23 +4988,16 @@ export default function AdminPage() {
                     </Button>
                     <Button
                       type="button"
-                      variant={visualEditorEnabled ? "primary" : "secondary"}
-                      onClick={() => setVisualEditorEnabled((previous) => !previous)}
-                    >
-                      {visualEditorEnabled ? "Selection On" : "Enable Selection"}
-                    </Button>
-                    <Button
-                      type="button"
                       onClick={() => void handleSaveCmsDraft()}
                       disabled={loadingCms || savingCmsDraft || publishingCms}
                     >
-                      {savingCmsDraft ? "Saving..." : "Save Draft"}
+                      {savingCmsDraft ? "Saving..." : "Save"}
                     </Button>
                     <Button
                       type="button"
                       variant="ghost"
-                      onClick={handleDiscardCmsDraftChanges}
-                      disabled={!cmsDraftDirty || loadingCms || savingCmsDraft || publishingCms}
+                      onClick={() => void handleDiscardCmsDraftChanges()}
+                      disabled={!canDiscardCmsChanges || loadingCms || savingCmsDraft || publishingCms}
                     >
                       Discard
                     </Button>
@@ -4066,7 +5016,7 @@ export default function AdminPage() {
                         setPreviewFullscreenInspectorOpen((previous) => !previous)
                       }
                     >
-                      {previewFullscreenInspectorOpen ? "Hide Editor" : "Show Editor"}
+                      {previewFullscreenInspectorOpen ? "Hide Panel" : "Show Panel"}
                     </Button>
                     <Button type="button" variant="secondary" onClick={() => setPreviewFullscreen(false)}>
                       Close
@@ -4075,6 +5025,7 @@ export default function AdminPage() {
                 </div>
               ) : null}
               <iframe
+                key={`${previewPath}-${previewFrameVersion}`}
                 ref={previewIframeRef}
                 src={previewPath}
                 title="Live storefront preview"
@@ -4126,16 +5077,40 @@ export default function AdminPage() {
                               <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
                                 Text color
                               </label>
-                              <input
-                                type="color"
-                                className={fieldClassName}
-                                value={toColorInputValue(previewEditableValues.color)}
-                                onChange={(event) => {
-                                  const value = event.target.value;
-                                  setPreviewEditableValues((previous) => ({ ...previous, color: value }));
-                                  applyPreviewEditableChanges({ color: value });
-                                }}
-                              />
+                              <div className="mt-1 flex items-center gap-2">
+                                <input
+                                  type="color"
+                                  className="h-10 w-14 rounded-xl border border-black/10 bg-white p-1"
+                                  value={toColorInputValue(previewEditableValues.color)}
+                                  onChange={(event) => {
+                                    const value = event.target.value;
+                                    setPreviewEditableValues((previous) => ({ ...previous, color: value }));
+                                    applyPreviewEditableChanges({ color: value });
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  className="rounded-xl border border-black/10 bg-white px-2.5 py-1.5 text-xs font-medium text-[var(--color-ink)]"
+                                  onClick={() => saveEditorColor(previewEditableValues.color)}
+                                >
+                                  Save
+                                </button>
+                                <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+                                  {savedEditorColors.map((savedColor) => (
+                                    <button
+                                      key={`fullscreen-text-${savedColor}`}
+                                      type="button"
+                                      title={savedColor}
+                                      className="h-6 w-6 rounded-md border border-black/15"
+                                      style={{ backgroundColor: savedColor }}
+                                      onClick={() => {
+                                        setPreviewEditableValues((previous) => ({ ...previous, color: savedColor }));
+                                        applyPreviewEditableChanges({ color: savedColor });
+                                      }}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
                             </div>
                           ) : null}
 
@@ -4252,6 +5227,108 @@ export default function AdminPage() {
                         </>
                       ) : null}
 
+                      {selectedPreviewCapabilities.background ? (
+                        <div>
+                          <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                            Background color
+                          </label>
+                          <div className="mt-1 flex items-center gap-2">
+                            <input
+                              type="color"
+                              className="h-10 w-14 rounded-xl border border-black/10 bg-white p-1"
+                              value={toColorInputValue(
+                                isTransparentBackgroundColor(previewEditableValues.backgroundColor)
+                                  ? "#ffffff"
+                                  : previewEditableValues.backgroundColor,
+                              )}
+                              disabled={isTransparentBackgroundColor(previewEditableValues.backgroundColor)}
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                setPreviewEditableValues((previous) => ({ ...previous, backgroundColor: value }));
+                                applyPreviewEditableChanges({ backgroundColor: value });
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="rounded-xl border border-black/10 bg-white px-2.5 py-1.5 text-xs font-medium text-[var(--color-ink)]"
+                              onClick={() => saveEditorColor(previewEditableValues.backgroundColor)}
+                              disabled={isTransparentBackgroundColor(previewEditableValues.backgroundColor)}
+                            >
+                              Save
+                            </button>
+                            <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+                              {savedEditorColors.map((savedColor) => (
+                                <button
+                                  key={`fullscreen-bg-${savedColor}`}
+                                  type="button"
+                                  title={savedColor}
+                                  className="h-6 w-6 rounded-md border border-black/15"
+                                  style={{ backgroundColor: savedColor }}
+                                  onClick={() => {
+                                    setPreviewEditableValues((previous) => ({
+                                      ...previous,
+                                      backgroundColor: savedColor,
+                                    }));
+                                    applyPreviewEditableChanges({ backgroundColor: savedColor });
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <label className="mt-2 flex items-center gap-2 text-xs text-[var(--color-muted)]">
+                            <input
+                              type="checkbox"
+                              checked={isTransparentBackgroundColor(previewEditableValues.backgroundColor)}
+                              onChange={(event) => {
+                                const value = event.target.checked ? "transparent" : "#ffffff";
+                                setPreviewEditableValues((previous) => ({ ...previous, backgroundColor: value }));
+                                applyPreviewEditableChanges({ backgroundColor: value });
+                              }}
+                            />
+                            Invisible background
+                          </label>
+                        </div>
+                      ) : null}
+
+                      {selectedPreviewCapabilities.shape ? (
+                        <div className="grid gap-2">
+                          <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                            Background shape
+                          </label>
+                          <select
+                            className={fieldClassName}
+                            value={getPreviewShapeOption(previewEditableValues.borderRadius)}
+                            onChange={(event) => {
+                              const option = event.target.value;
+                              if (option === "custom") {
+                                return;
+                              }
+
+                              const radius = option === "pill" ? "9999px" : "1.5rem";
+                              setPreviewEditableValues((previous) => ({ ...previous, borderRadius: radius }));
+                              applyPreviewEditableChanges({ borderRadius: radius });
+                            }}
+                          >
+                            <option value="rounded-square">Rounded Square</option>
+                            <option value="pill">Pill</option>
+                            <option value="custom">Custom Radius</option>
+                          </select>
+                          <input
+                            className={fieldClassName}
+                            value={previewEditableValues.borderRadius}
+                            placeholder="e.g. 24px"
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              setPreviewEditableValues((previous) => ({
+                                ...previous,
+                                borderRadius: value,
+                              }));
+                              applyPreviewEditableChanges({ borderRadius: value });
+                            }}
+                          />
+                        </div>
+                      ) : null}
+
                       {selectedPreviewCapabilities.image ? (
                         <div className="space-y-3">
                           <div
@@ -4281,8 +5358,14 @@ export default function AdminPage() {
                                 onChange={handleQuickEditorImageInputChange}
                               />
                             </label>
+                            {quickImageUploadFeedback ? (
+                              <p className="mt-2 text-xs text-[var(--color-muted)]">{quickImageUploadFeedback}</p>
+                            ) : null}
                             {isQuickImageUploading ? (
                               <p className="mt-2 text-xs text-[var(--color-muted)]">Uploading image...</p>
+                            ) : null}
+                            {cmsMediaUploadError ? (
+                              <p className="mt-2 text-xs text-red-600">{cmsMediaUploadError}</p>
                             ) : null}
                           </div>
 
@@ -4311,6 +5394,233 @@ export default function AdminPage() {
                       Click any outlined element in the preview to edit it here.
                     </p>
                   )}
+
+                  <div className="mt-3 rounded-xl border border-black/10 bg-[var(--color-neutral-100)]/50 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)]">
+                          Home Custom Blocks
+                        </p>
+                        <p className="mt-1 text-xs text-[var(--color-muted)]">
+                          Add or remove homepage text and image blocks.
+                        </p>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-[11px] text-[var(--color-muted)]">
+                      Use the top-left menu button to add text or image blocks.
+                    </p>
+
+                    {cmsHomeDraft.customBlocks.length === 0 ? (
+                      <p className="mt-3 text-xs text-[var(--color-muted)]">No custom blocks yet.</p>
+                    ) : (
+                      <div className="mt-3 space-y-3">
+                        {cmsHomeDraft.customBlocks.map((block, index) => (
+                          <div key={block.id} className="rounded-lg border border-black/10 bg-white p-2.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
+                                Block {index + 1}: {block.type}
+                              </p>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => removeCmsHomeCustomBlock(block.id)}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+
+                            {block.type === "text" ? (
+                              <div className="mt-2 grid gap-2">
+                                <textarea
+                                  className={fieldClassName}
+                                  rows={2}
+                                  value={block.text}
+                                  placeholder="Text EN"
+                                  onChange={(event) =>
+                                    updateCmsHomeCustomBlock(block.id, "text", event.target.value)
+                                  }
+                                />
+                                <textarea
+                                  className={fieldClassName}
+                                  rows={2}
+                                  value={block.textNl}
+                                  placeholder="Text NL"
+                                  onChange={(event) =>
+                                    updateCmsHomeCustomBlock(block.id, "textNl", event.target.value)
+                                  }
+                                />
+                                <div className="rounded-lg border border-black/10 bg-[var(--color-neutral-100)]/40 p-2.5">
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
+                                    Background
+                                  </p>
+                                  <div className="mt-2 grid gap-2">
+                                    <label className="text-[11px] font-medium text-[var(--color-muted)]">
+                                      Background Color
+                                    </label>
+                                    <input
+                                      type="color"
+                                      className={`${fieldClassName} h-10`}
+                                      value={
+                                        block.backgroundColor === "transparent"
+                                          ? "#ffffff"
+                                          : block.backgroundColor || "#ffffff"
+                                      }
+                                      disabled={block.backgroundColor === "transparent"}
+                                      onChange={(event) =>
+                                        updateCmsHomeCustomBlock(block.id, "backgroundColor", event.target.value)
+                                      }
+                                    />
+                                    <label className="flex items-center gap-2 text-[11px] text-[var(--color-muted)]">
+                                      <input
+                                        type="checkbox"
+                                        checked={block.backgroundColor === "transparent"}
+                                        onChange={(event) =>
+                                          updateCmsHomeCustomBlock(
+                                            block.id,
+                                            "backgroundColor",
+                                            event.target.checked ? "transparent" : "#ffffff",
+                                          )
+                                        }
+                                      />
+                                      Invisible background
+                                    </label>
+                                    <label className="text-[11px] font-medium text-[var(--color-muted)]">
+                                      Background Shape
+                                    </label>
+                                    <select
+                                      className={fieldClassName}
+                                      value={block.backgroundShape}
+                                      onChange={(event) =>
+                                        updateCmsHomeCustomBlock(block.id, "backgroundShape", event.target.value)
+                                      }
+                                    >
+                                      <option value="rounded-square">Rounded Square</option>
+                                      <option value="pill">Pill</option>
+                                    </select>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="mt-2 grid gap-2">
+                                <div
+                                  className="rounded-lg border border-dashed border-black/20 bg-[var(--color-neutral-100)]/50 px-3 py-3 text-center text-xs text-[var(--color-muted)]"
+                                  onDragOver={(event) => {
+                                    event.preventDefault();
+                                    event.dataTransfer.dropEffect = "copy";
+                                  }}
+                                  onDrop={(event) => {
+                                    event.preventDefault();
+                                    const file = event.dataTransfer.files?.[0];
+                                    if (file) {
+                                      void handleCustomBlockImageUpload(block.id, file);
+                                    }
+                                  }}
+                                >
+                                  <p className="font-semibold text-[var(--color-ink)]">Drop image here</p>
+                                  <label className="mt-2 inline-flex cursor-pointer items-center rounded-lg border border-black/10 bg-white px-2.5 py-1.5 text-xs font-medium text-[var(--color-ink)]">
+                                    Upload
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      onChange={(event) => {
+                                        const file = event.target.files?.[0];
+                                        if (file) {
+                                          void handleCustomBlockImageUpload(block.id, file);
+                                        }
+                                        event.target.value = "";
+                                      }}
+                                    />
+                                  </label>
+                                  {uploadingCustomBlockId === block.id ? (
+                                    <p className="mt-2 text-[11px] text-[var(--color-muted)]">Uploading...</p>
+                                  ) : null}
+                                  {customBlockUploadError ? (
+                                    <p className="mt-2 text-[11px] text-red-600">{customBlockUploadError}</p>
+                                  ) : null}
+                                </div>
+
+                                <input
+                                  className={fieldClassName}
+                                  value={block.imageUrl}
+                                  placeholder="Image URL"
+                                  onChange={(event) =>
+                                    updateCmsHomeCustomBlock(block.id, "imageUrl", event.target.value)
+                                  }
+                                />
+                                <input
+                                  className={fieldClassName}
+                                  value={block.alt}
+                                  placeholder="Alt EN"
+                                  onChange={(event) =>
+                                    updateCmsHomeCustomBlock(block.id, "alt", event.target.value)
+                                  }
+                                />
+                                <input
+                                  className={fieldClassName}
+                                  value={block.altNl}
+                                  placeholder="Alt NL"
+                                  onChange={(event) =>
+                                    updateCmsHomeCustomBlock(block.id, "altNl", event.target.value)
+                                  }
+                                />
+                                <div className="rounded-lg border border-black/10 bg-[var(--color-neutral-100)]/40 p-2.5">
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
+                                    Background
+                                  </p>
+                                  <div className="mt-2 grid gap-2">
+                                    <label className="text-[11px] font-medium text-[var(--color-muted)]">
+                                      Background Color
+                                    </label>
+                                    <input
+                                      type="color"
+                                      className={`${fieldClassName} h-10`}
+                                      value={
+                                        block.backgroundColor === "transparent"
+                                          ? "#ffffff"
+                                          : block.backgroundColor || "#ffffff"
+                                      }
+                                      disabled={block.backgroundColor === "transparent"}
+                                      onChange={(event) =>
+                                        updateCmsHomeCustomBlock(block.id, "backgroundColor", event.target.value)
+                                      }
+                                    />
+                                    <label className="flex items-center gap-2 text-[11px] text-[var(--color-muted)]">
+                                      <input
+                                        type="checkbox"
+                                        checked={block.backgroundColor === "transparent"}
+                                        onChange={(event) =>
+                                          updateCmsHomeCustomBlock(
+                                            block.id,
+                                            "backgroundColor",
+                                            event.target.checked ? "transparent" : "#ffffff",
+                                          )
+                                        }
+                                      />
+                                      Invisible background
+                                    </label>
+                                    <label className="text-[11px] font-medium text-[var(--color-muted)]">
+                                      Background Shape
+                                    </label>
+                                    <select
+                                      className={fieldClassName}
+                                      value={block.backgroundShape}
+                                      onChange={(event) =>
+                                        updateCmsHomeCustomBlock(block.id, "backgroundShape", event.target.value)
+                                      }
+                                    >
+                                      <option value="rounded-square">Rounded Square</option>
+                                      <option value="pill">Pill</option>
+                                    </select>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
                   <button
                     type="button"
@@ -4664,17 +5974,62 @@ export default function AdminPage() {
 
             <div className="md:col-span-2">
               <label className="text-sm font-medium text-[var(--color-ink)]">Hero Image URL (optional)</label>
-              <input
-                className={fieldClassName}
-                value={categoryForm.heroImage}
-                onChange={(event) =>
-                  setCategoryForm((previous) => ({
-                    ...previous,
-                    heroImage: event.target.value,
-                  }))
-                }
-                placeholder="https://images.unsplash.com/..."
-              />
+              <div className="mt-2 flex flex-col gap-3 md:flex-row md:items-start">
+                <label
+                  className={`group flex h-28 w-full max-w-[12rem] cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed transition md:h-32 ${
+                    isDraggingCategoryHero
+                      ? "border-[var(--color-wood-dark)] bg-[var(--color-neutral-100)]"
+                      : "border-black/15 bg-[var(--color-neutral-100)]/40 hover:border-[var(--color-wood)]"
+                  }`}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "copy";
+                    setIsDraggingCategoryHero(true);
+                  }}
+                  onDragLeave={() => setIsDraggingCategoryHero(false)}
+                  onDrop={handleCategoryHeroDrop}
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleCategoryHeroInputChange}
+                  />
+                  {categoryForm.heroImage ? (
+                    <img
+                      src={categoryForm.heroImage}
+                      alt="Category hero preview"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="px-3 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-muted)]">
+                      Drop Image Here
+                    </span>
+                  )}
+                </label>
+
+                <div className="min-w-0 flex-1">
+                  {isUploadingCategoryHero ? (
+                    <p className="mb-2 text-xs text-[var(--color-muted)]">Uploading hero image...</p>
+                  ) : null}
+                  {categoryHeroUploadError ? (
+                    <p className="mb-2 rounded-lg bg-red-100 px-3 py-2 text-xs text-red-700">
+                      {categoryHeroUploadError}
+                    </p>
+                  ) : null}
+                  <input
+                    className={fieldClassName}
+                    value={categoryForm.heroImage}
+                    onChange={(event) =>
+                      setCategoryForm((previous) => ({
+                        ...previous,
+                        heroImage: event.target.value,
+                      }))
+                    }
+                    placeholder="https://images.unsplash.com/..."
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="md:col-span-2">
@@ -4829,9 +6184,8 @@ export default function AdminPage() {
               <label className="text-sm font-medium text-[var(--color-ink)]">Base Price (USD) *</label>
               <input
                 className={fieldClassName}
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 value={productForm.basePrice}
                 onChange={(event) =>
                   setProductForm((prev) => ({
@@ -5131,6 +6485,7 @@ export default function AdminPage() {
                           />
                           <input
                             className="w-full rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm text-[var(--color-ink)] transition focus:border-[var(--color-wood)] focus:outline-none focus:ring-1 focus:ring-[var(--color-wood)]/20"
+                            inputMode="decimal"
                             value={choice.priceModifier}
                             onChange={(event) =>
                               updateCustomChoiceField(option.formId, choice.formId, "priceModifier", event.target.value)
@@ -5382,7 +6737,7 @@ export default function AdminPage() {
                       <td className="px-4 py-3 text-[var(--color-ink)]">{product.name}</td>
                       <td className="px-4 py-3 text-[var(--color-muted)]">{product.category}</td>
                       <td className="px-4 py-3 text-[var(--color-ink)] font-medium">
-                        ${product.base_price}
+                        ${formatAdminPrice(product.base_price)}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-3">
@@ -5415,6 +6770,57 @@ export default function AdminPage() {
           </p>
         </div>
           </>
+        ) : null}
+
+        {confirmDialogAction ? (
+          <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px]">
+            <div className="w-full max-w-md rounded-2xl border border-black/10 bg-white p-5 shadow-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-wood-dark)]">
+                Confirm Action
+              </p>
+              <h3 className="mt-2 text-xl font-semibold text-[var(--color-ink)]">
+                {confirmDialogAction === "publish" ? "Publish Changes Live?" : "Discard Unsaved Changes?"}
+              </h3>
+              <p className="mt-2 text-sm text-[var(--color-muted)]">
+                {confirmDialogAction === "publish"
+                  ? "This will make your current draft visible on the live website immediately."
+                  : "This will remove all unsaved edits and restore the last saved state."}
+              </p>
+              <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                {confirmDialogAction === "discard"
+                  ? "This action will discard all changes up untill your last save"
+                  : "This action is important and can affect what visitors see."}
+              </p>
+
+              <div className="mt-5 flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setConfirmDialogAction(null)}
+                >
+                  Cancel
+                </Button>
+                <button
+                  type="button"
+                  className="rounded-xl bg-[var(--color-wood-dark)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--color-wood)] disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={publishingCms || savingCmsDraft || loadingCms}
+                  onClick={() => {
+                    const action = confirmDialogAction;
+                    setConfirmDialogAction(null);
+
+                    if (action === "discard") {
+                      void handleDiscardCmsDraftChanges(true);
+                      return;
+                    }
+
+                    void handlePublishCms(true);
+                  }}
+                >
+                  {confirmDialogAction === "publish" ? "Yes, Publish Live" : "Yes, Discard Changes"}
+                </button>
+              </div>
+            </div>
+          </div>
         ) : null}
       </div>
     </div>

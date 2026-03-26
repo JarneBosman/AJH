@@ -1,11 +1,11 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
-import { getCustomizationOptions } from "@/data/shop-data";
 import { ProductCard } from "@/components/shop/product-card";
 import { SectionHeading } from "@/components/ui/section-heading";
-import { getCategoryBySlugFromStore } from "@/lib/categories-repository";
+import { getAllCategoriesFromStore, getCategoryBySlugFromStore } from "@/lib/categories-repository";
 import { localizeCategory, localizeProduct } from "@/lib/content-localization";
-import { getProductsByCategoryFromStore } from "@/lib/products-repository";
+import { getAllProducts, getProductsByCategoryFromStore } from "@/lib/products-repository";
 import { getTranslations, languageCookieName, normalizeLanguage } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
@@ -20,18 +20,30 @@ export default async function CategoryPage({
   const t = getTranslations(language);
 
   const { category } = await params;
-  const categoryData = await getCategoryBySlugFromStore(category);
+  const isAllCategory = category === "all";
+  const categoryData = isAllCategory
+    ? {
+        slug: "all",
+        name: "All",
+        nameNl: "Alle",
+        description: "Browse every product in the collection.",
+        descriptionNl: "Bekijk alle producten in de collectie.",
+        heroImage: "",
+      }
+    : await getCategoryBySlugFromStore(category);
 
   if (!categoryData) {
     notFound();
   }
 
   const localizedCategory = localizeCategory(categoryData, language);
+  const categories = (await getAllCategoriesFromStore()).map((entry) => localizeCategory(entry, language));
 
-  const categoryProducts = (await getProductsByCategoryFromStore(categoryData.slug)).map((product) =>
+  const categoryProducts = (
+    isAllCategory ? await getAllProducts() : await getProductsByCategoryFromStore(categoryData.slug)
+  ).map((product) =>
     localizeProduct(product, language),
   );
-  const options = getCustomizationOptions(categoryData.slug);
 
   return (
     <section className="mx-auto w-full max-w-7xl px-4 pb-16 pt-10 sm:px-6 md:px-10 md:pb-20 md:pt-12">
@@ -41,20 +53,34 @@ export default async function CategoryPage({
         description={t.categoryDescription}
       />
 
-      <div className="mt-8 rounded-3xl border border-black/5 bg-white p-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-muted)]">
-          {t.categoryCustomizations}
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {options.map((option) => (
-            <span
-              key={option.id}
-              className="rounded-full bg-[var(--color-neutral-100)] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-ink)]"
+      <div className="mt-7 flex flex-wrap gap-2">
+        <Link
+          href="/shop/all"
+          className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition ${
+            isAllCategory
+              ? "border-[var(--color-wood)] bg-[var(--color-neutral-100)] text-[var(--color-ink)]"
+              : "border-black/10 bg-white text-[var(--color-ink)] hover:border-[var(--color-wood)]"
+          }`}
+        >
+          {language === "nl" ? "Alle" : "All"}
+        </Link>
+        {categories.map((entry) => {
+          const isActive = !isAllCategory && entry.slug === categoryData.slug;
+
+          return (
+            <Link
+              key={entry.slug}
+              href={`/shop/${entry.slug}`}
+              className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition ${
+                isActive
+                  ? "border-[var(--color-wood)] bg-[var(--color-neutral-100)] text-[var(--color-ink)]"
+                  : "border-black/10 bg-white text-[var(--color-ink)] hover:border-[var(--color-wood)]"
+              }`}
             >
-              {option.label}
-            </span>
-          ))}
-        </div>
+              {entry.name}
+            </Link>
+          );
+        })}
       </div>
 
       <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">

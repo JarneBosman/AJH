@@ -49,6 +49,12 @@ alter table public.products
   add column if not exists story_nl text;
 
 alter table public.products
+  add column if not exists created_at timestamptz not null default now();
+
+alter table public.products
+  add column if not exists updated_at timestamptz not null default now();
+
+alter table public.products
   drop constraint if exists products_category_check;
 
 create table if not exists public.categories (
@@ -68,6 +74,12 @@ alter table public.categories
 
 alter table public.categories
   add column if not exists description_nl text;
+
+alter table public.categories
+  add column if not exists created_at timestamptz not null default now();
+
+alter table public.categories
+  add column if not exists updated_at timestamptz not null default now();
 
 update public.categories
 set
@@ -162,6 +174,27 @@ alter table public.site_settings
 
 alter table public.site_settings
   add column if not exists hero_layout text not null default 'split';
+
+alter table public.site_settings
+  add column if not exists updated_at timestamptz not null default now();
+
+alter table public.cms_pages
+  add column if not exists created_at timestamptz not null default now();
+
+alter table public.cms_pages
+  add column if not exists updated_at timestamptz not null default now();
+
+alter table public.cms_navigation
+  add column if not exists created_at timestamptz not null default now();
+
+alter table public.cms_navigation
+  add column if not exists updated_at timestamptz not null default now();
+
+alter table public.cms_media_assets
+  add column if not exists created_at timestamptz not null default now();
+
+alter table public.cms_media_assets
+  add column if not exists updated_at timestamptz not null default now();
 
 alter table public.site_settings
   drop constraint if exists site_settings_container_width_check;
