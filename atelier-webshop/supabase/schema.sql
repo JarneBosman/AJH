@@ -113,7 +113,10 @@ create table if not exists public.admin_users (
 create table if not exists public.site_settings (
   id int primary key default 1 check (id = 1),
   brand_name text not null default 'Atelier Nord',
+  logo_url text not null default '',
+  logo_color text not null default '#2b231d',
   color_bg text not null default '#fbfaf8',
+  color_text text not null default '#2b231d',
   color_ink text not null default '#2b231d',
   color_muted text not null default '#6f655c',
   color_neutral_100 text not null default '#f2ede7',
@@ -121,6 +124,12 @@ create table if not exists public.site_settings (
   color_neutral_300 text not null default '#d7cabc',
   color_wood text not null default '#b88a5b',
   color_wood_dark text not null default '#7f5534',
+  color_button_bg text not null default '#7f5534',
+  color_button_bg_hover text not null default '#b88a5b',
+  color_button_text text not null default '#ffffff',
+  font_body text not null default 'manrope',
+  font_heading text not null default 'jakarta',
+  button_radius text not null default '9999px',
   layout_mode text not null default 'balanced' check (layout_mode in ('compact', 'balanced', 'spacious')),
   container_width text not null default 'standard' check (container_width in ('narrow', 'standard', 'wide')),
   section_spacing text not null default 'balanced' check (section_spacing in ('tight', 'balanced', 'airy')),
@@ -165,6 +174,33 @@ create table if not exists public.cms_media_assets (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.site_settings
+  add column if not exists logo_url text not null default '';
+
+alter table public.site_settings
+  add column if not exists logo_color text not null default '#2b231d';
+
+alter table public.site_settings
+  add column if not exists color_text text not null default '#2b231d';
+
+alter table public.site_settings
+  add column if not exists color_button_bg text not null default '#7f5534';
+
+alter table public.site_settings
+  add column if not exists color_button_bg_hover text not null default '#b88a5b';
+
+alter table public.site_settings
+  add column if not exists color_button_text text not null default '#ffffff';
+
+alter table public.site_settings
+  add column if not exists font_body text not null default 'manrope';
+
+alter table public.site_settings
+  add column if not exists font_heading text not null default 'jakarta';
+
+alter table public.site_settings
+  add column if not exists button_radius text not null default '9999px';
 
 alter table public.site_settings
   add column if not exists container_width text not null default 'standard';

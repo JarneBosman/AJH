@@ -4,7 +4,10 @@ import { useEffect } from "react";
 
 interface AppearancePreviewPayload {
   brandName: string;
+  logoUrl: string;
+  logoColor: string;
   colorBg: string;
+  colorText: string;
   colorInk: string;
   colorMuted: string;
   colorNeutral100: string;
@@ -12,6 +15,9 @@ interface AppearancePreviewPayload {
   colorNeutral300: string;
   colorWood: string;
   colorWoodDark: string;
+  colorButtonBg: string;
+  colorButtonBgHover: string;
+  colorButtonText: string;
   layoutMode: "compact" | "balanced" | "spacious";
   containerWidth: "narrow" | "standard" | "wide";
   sectionSpacing: "tight" | "balanced" | "airy";
@@ -47,6 +53,7 @@ interface OverlaySelectedMessage {
   type: "cms-preview:selected";
   payload: {
     id: string;
+    tagName: string;
     capabilities: {
       text: boolean;
       color: boolean;
@@ -92,6 +99,12 @@ type PreviewMessage =
       };
     }
   | {
+      type: "cms-preview:hidden-editables";
+      payload: {
+        ids: string[];
+      };
+    }
+  | {
       type: "cms-preview:editor:toggle";
       payload: { enabled: boolean };
     }
@@ -121,6 +134,12 @@ type PreviewMessage =
           width: number;
           height: number;
         }>;
+      };
+    }
+  | {
+      type: "cms-preview:editor:remove";
+      payload: {
+        id: string;
       };
     };
 
@@ -315,6 +334,8 @@ const renderHomeCustomBlocks = (
       const article = document.createElement("article");
       article.className =
         "rounded-3xl border border-black/5 bg-white px-5 py-6 text-[var(--color-muted)] shadow-[0_20px_45px_-35px_rgba(0,0,0,0.45)]";
+      article.dataset.cmsEditable = `home.customBlock.${block.id}`;
+      article.dataset.cmsEditTypes = "text,color,shape,location,background";
       article.style.backgroundColor = nextBackground;
       article.style.borderRadius = nextRadius;
 
@@ -327,10 +348,13 @@ const renderHomeCustomBlocks = (
       continue;
     }
 
-    if (block.type === "image" && block.imageUrl?.trim()) {
+    if (block.type === "image") {
       const figure = document.createElement("figure");
       figure.className =
         "relative overflow-hidden rounded-3xl border border-black/5 bg-white shadow-[0_25px_55px_-35px_rgba(0,0,0,0.5)]";
+      figure.dataset.cmsEditable = `home.customBlock.${block.id}`;
+      figure.dataset.cmsEditTypes = "image,shape,location,background";
+      figure.dataset.cmsImageTarget = ".cms-custom-block-image";
       figure.style.backgroundColor = nextBackground;
       figure.style.borderRadius = nextRadius;
 
@@ -338,11 +362,21 @@ const renderHomeCustomBlocks = (
       wrapper.className = "relative aspect-[4/3] w-full";
 
       const image = document.createElement("img");
-      image.src = block.imageUrl;
+      image.src =
+        block.imageUrl?.trim() || "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
       image.alt = block.alt?.trim() || "Homepage custom block image";
-      image.className = "h-full w-full object-cover";
+      image.className = "cms-custom-block-image h-full w-full object-cover";
 
       wrapper.appendChild(image);
+
+      if (!block.imageUrl?.trim()) {
+        const placeholder = document.createElement("div");
+        placeholder.className =
+          "pointer-events-none absolute inset-0 flex items-center justify-center bg-[var(--color-neutral-200)] text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]";
+        placeholder.textContent = "Add image";
+        wrapper.appendChild(placeholder);
+      }
+
       figure.appendChild(wrapper);
       container.appendChild(figure);
     }
@@ -352,6 +386,37 @@ const renderHomeCustomBlocks = (
     section.classList.add("hidden");
   } else {
     section.classList.remove("hidden");
+  }
+};
+
+const removeEditableNodesById = (ids: string[], attempt = 0) => {
+  if (ids.length === 0) {
+    return;
+  }
+
+  let missing = false;
+
+  for (const id of ids) {
+    const element = findEditableElementById(id);
+    if (!element) {
+      missing = true;
+      continue;
+    }
+
+    let removeTarget: HTMLElement = element;
+    if (
+      element.tagName === "BUTTON" &&
+      element.parentElement?.tagName === "A" &&
+      element.parentElement.children.length === 1
+    ) {
+      removeTarget = element.parentElement as HTMLElement;
+    }
+
+    removeTarget.remove();
+  }
+
+  if (missing && attempt < 6) {
+    window.setTimeout(() => removeEditableNodesById(ids, attempt + 1), 120);
   }
 };
 
@@ -409,6 +474,7 @@ export const CmsPreviewBridge = () => {
         type: "cms-preview:selected",
         payload: {
           id,
+          tagName: element.tagName,
           capabilities: parseEditTypes(element),
           values: collectValues(element),
         },
@@ -502,6 +568,7 @@ export const CmsPreviewBridge = () => {
         const payload = message.payload;
 
         document.body.style.setProperty("--color-bg", payload.colorBg);
+        document.body.style.setProperty("--color-text", payload.colorText);
         document.body.style.setProperty("--color-ink", payload.colorInk);
         document.body.style.setProperty("--color-muted", payload.colorMuted);
         document.body.style.setProperty("--color-neutral-100", payload.colorNeutral100);
@@ -509,6 +576,10 @@ export const CmsPreviewBridge = () => {
         document.body.style.setProperty("--color-neutral-300", payload.colorNeutral300);
         document.body.style.setProperty("--color-wood", payload.colorWood);
         document.body.style.setProperty("--color-wood-dark", payload.colorWoodDark);
+        document.body.style.setProperty("--color-button-bg", payload.colorButtonBg);
+        document.body.style.setProperty("--color-button-bg-hover", payload.colorButtonBgHover);
+        document.body.style.setProperty("--color-button-text", payload.colorButtonText);
+        document.body.style.setProperty("--color-logo", payload.logoColor);
         document.body.style.setProperty("--font-body", resolveFontPreset(payload.fontBody, "body"));
         document.body.style.setProperty("--font-heading", resolveFontPreset(payload.fontHeading, "heading"));
         document.body.style.setProperty("--button-radius", payload.buttonRadius || "9999px");
@@ -522,11 +593,27 @@ export const CmsPreviewBridge = () => {
           brandNode.textContent = payload.brandName || "Atelier Nord";
         }
 
+        const logoImageNode = document.querySelector<HTMLImageElement>("[data-preview-logo-image]");
+        if (logoImageNode && payload.logoUrl) {
+          logoImageNode.removeAttribute("srcset");
+          logoImageNode.src = payload.logoUrl;
+          logoImageNode.setAttribute("src", payload.logoUrl);
+        }
+
         return;
       }
 
       if (message.type === "cms-preview:home-custom-blocks") {
         renderHomeCustomBlocks(message.payload.blocks);
+        return;
+      }
+
+      if (message.type === "cms-preview:hidden-editables") {
+        const ids = Array.isArray(message.payload.ids)
+          ? message.payload.ids.filter((entry): entry is string => typeof entry === "string")
+          : [];
+
+        removeEditableNodesById(ids);
         return;
       }
 
@@ -563,6 +650,30 @@ export const CmsPreviewBridge = () => {
 
         applyChange(element, message.payload.changes);
         postSelectedToParent(element);
+        return;
+      }
+
+      if (message.type === "cms-preview:editor:remove") {
+        const element = findEditableElementById(message.payload.id);
+        if (!element) {
+          return;
+        }
+
+        let removeTarget: HTMLElement = element;
+        if (
+          element.tagName === "BUTTON" &&
+          element.parentElement?.tagName === "A" &&
+          element.parentElement.children.length === 1
+        ) {
+          removeTarget = element.parentElement as HTMLElement;
+        }
+
+        removeTarget.remove();
+
+        if (selectedId === message.payload.id) {
+          selectedId = null;
+          updateEditorState();
+        }
       }
     };
 
@@ -781,11 +892,43 @@ export const CmsPreviewBridge = () => {
       postSelectedToParent(editable);
     };
 
+    const isTypingTarget = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) {
+        return false;
+      }
+
+      const tag = target.tagName.toLowerCase();
+      return tag === "input" || tag === "textarea" || tag === "select" || target.isContentEditable;
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!editorEnabled || !selectedId || isTypingTarget(event.target)) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      if (key !== "delete" && key !== "backspace") {
+        return;
+      }
+
+      event.preventDefault();
+      window.parent.postMessage(
+        {
+          type: "cms-preview:editor:delete-selected",
+          payload: {
+            id: selectedId,
+          },
+        },
+        window.location.origin,
+      );
+    };
+
     window.addEventListener("message", handler);
     document.addEventListener("click", handleClick, true);
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("pointermove", handlePointerMove);
     document.addEventListener("pointerup", handlePointerUp);
+    document.addEventListener("keydown", handleKeyDown);
 
     return () => {
       window.removeEventListener("message", handler);
@@ -793,6 +936,7 @@ export const CmsPreviewBridge = () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("pointermove", handlePointerMove);
       document.removeEventListener("pointerup", handlePointerUp);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
 

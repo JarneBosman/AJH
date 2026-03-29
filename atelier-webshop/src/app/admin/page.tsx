@@ -57,7 +57,10 @@ type FontPreset = "manrope" | "jakarta" | "system" | "serif";
 
 interface AppearanceSettingsState {
   brandName: string;
+  logoUrl: string;
+  logoColor: string;
   colorBg: string;
+  colorText: string;
   colorInk: string;
   colorMuted: string;
   colorNeutral100: string;
@@ -65,6 +68,9 @@ interface AppearanceSettingsState {
   colorNeutral300: string;
   colorWood: string;
   colorWoodDark: string;
+  colorButtonBg: string;
+  colorButtonBgHover: string;
+  colorButtonText: string;
   layoutMode: LayoutMode;
   containerWidth: ContainerWidthMode;
   sectionSpacing: SectionSpacingMode;
@@ -122,6 +128,7 @@ interface CmsHomeDraftState {
   storyPointTwoNl: string;
   storyPointThree: string;
   storyPointThreeNl: string;
+  hiddenEditableIds: string[];
   customBlocks: CmsHomeContentBlockState[];
 }
 
@@ -229,6 +236,21 @@ interface PreviewEditHistoryEntry {
   id: string;
   before: PreviewEditableValues;
   after: PreviewEditableValues;
+  hiddenEditableIdsBefore?: string[];
+  hiddenEditableIdsAfter?: string[];
+  customBlocksBefore?: CmsHomeContentBlockState[];
+  customBlocksAfter?: CmsHomeContentBlockState[];
+  customBlockLayoutAfter?: Record<
+    string,
+    {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    }
+  >;
+  selectedEditableIdBefore?: string;
+  selectedEditableIdAfter?: string;
 }
 
 interface FullscreenInspectorPosition {
@@ -239,6 +261,13 @@ interface FullscreenInspectorPosition {
 interface FullscreenInspectorSize {
   width: number;
   height: number;
+}
+
+interface PendingDeleteAction {
+  mode: "custom-block" | "home-binding" | "clear-text";
+  editableId: string;
+  label: string;
+  blockId?: string;
 }
 
 interface NewProductState {
@@ -270,7 +299,10 @@ const createInitialCategoryState = (): NewCategoryState => ({
 
 const createInitialAppearanceState = (): AppearanceSettingsState => ({
   brandName: "Atelier Nord",
+  logoUrl: "",
+  logoColor: "#2b231d",
   colorBg: "#fbfaf8",
+  colorText: "#2b231d",
   colorInk: "#2b231d",
   colorMuted: "#6f655c",
   colorNeutral100: "#f2ede7",
@@ -278,6 +310,9 @@ const createInitialAppearanceState = (): AppearanceSettingsState => ({
   colorNeutral300: "#d7cabc",
   colorWood: "#b88a5b",
   colorWoodDark: "#7f5534",
+  colorButtonBg: "#7f5534",
+  colorButtonBgHover: "#b88a5b",
+  colorButtonText: "#ffffff",
   layoutMode: "balanced",
   containerWidth: "standard",
   sectionSpacing: "balanced",
@@ -329,6 +364,7 @@ const createInitialCmsHomeDraftState = (): CmsHomeDraftState => ({
   storyPointTwoNl: "",
   storyPointThree: "",
   storyPointThreeNl: "",
+  hiddenEditableIds: [],
   customBlocks: [],
 });
 
@@ -470,6 +506,11 @@ const parseNavigationEditableId = (id: string): CmsNavigationBinding | null => {
   };
 };
 
+const parseCustomHomeBlockEditableId = (id: string): string | null => {
+  const match = id.match(/^home\.customBlock\.(.+)$/);
+  return match ? match[1] : null;
+};
+
 const parseCmsHomeDraft = (value: unknown): CmsHomeDraftState => {
   const defaults = createInitialCmsHomeDraftState();
 
@@ -478,6 +519,16 @@ const parseCmsHomeDraft = (value: unknown): CmsHomeDraftState => {
   }
 
   const source = value as Record<string, unknown>;
+  const hiddenEditableIds = Array.isArray(source.hiddenEditableIds)
+    ? Array.from(
+        new Set(
+          source.hiddenEditableIds
+            .filter((entry): entry is string => typeof entry === "string")
+            .map((entry) => entry.trim())
+            .filter(Boolean),
+        ),
+      )
+    : [];
   const rawBlocks = Array.isArray(source.customBlocks) ? source.customBlocks : [];
   const customBlocks = rawBlocks
     .map((entry): CmsHomeContentBlockState | null => {
@@ -541,6 +592,7 @@ const parseCmsHomeDraft = (value: unknown): CmsHomeDraftState => {
     storyPointTwoNl: asText(source.storyPointTwoNl),
     storyPointThree: asText(source.storyPointThree),
     storyPointThreeNl: asText(source.storyPointThreeNl),
+    hiddenEditableIds,
     customBlocks,
   };
 };
@@ -672,15 +724,70 @@ const normalizeOptionId = (value: string) =>
     .replace(/\s+/g, "_")
     .replace(/[^a-z0-9_-]/g, "");
 
+const rgbLikeToHex = (value: string) => {
+  const match = value
+    .trim()
+    .match(/^rgba?\(\s*(\d{1,3})\s*[ ,]\s*(\d{1,3})\s*[ ,]\s*(\d{1,3})(?:\s*[,/]\s*[\d.]+)?\s*\)$/i);
+
+  if (!match) {
+    return null;
+  }
+
+  const [r, g, b] = match.slice(1, 4).map((entry) => Number(entry));
+  if ([r, g, b].some((channel) => Number.isNaN(channel) || channel < 0 || channel > 255)) {
+    return null;
+  }
+
+  const toHex = (channel: number) => channel.toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+};
+
 const toColorInputValue = (value: string) => {
   const trimmed = value.trim();
-  return /^#([0-9a-fA-F]{6})$/.test(trimmed) ? trimmed : "#c9a97c";
+  if (/^#([0-9a-fA-F]{6})$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const parsedRgb = rgbLikeToHex(trimmed);
+  return parsedRgb ?? "#c9a97c";
 };
 
 const savedEditorColorsStorageKey = "cms-editor-saved-colors-v1";
 const maxSavedEditorColors = 12;
 
 const normalizeSavedEditorColor = (value: string) => toColorInputValue(value).toLowerCase();
+
+const applyColorFieldChange = (
+  field: "color" | "backgroundColor",
+  value: string,
+  applyPreviewEditableChanges: (
+    changes: Partial<{
+      text: string;
+      color: string;
+      fontFamily: string;
+      fontSize: string;
+      fontWeight: string;
+      backgroundColor: string;
+      borderRadius: string;
+      imageUrl: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    }>,
+    options?: {
+      skipHistory?: boolean;
+      targetId?: string;
+    },
+  ) => void,
+) => {
+  if (field === "color") {
+    applyPreviewEditableChanges({ color: value });
+    return;
+  }
+
+  applyPreviewEditableChanges({ backgroundColor: value });
+};
 
 const isTransparentBackgroundColor = (value: string) => {
   const trimmed = value.trim().toLowerCase();
@@ -853,6 +960,7 @@ export default function AdminPage() {
   const [visualEditorEnabled, setVisualEditorEnabled] = useState(false);
   const [previewGridEnabled, setPreviewGridEnabled] = useState(false);
   const [selectedPreviewEditableId, setSelectedPreviewEditableId] = useState("");
+  const [selectedPreviewTagName, setSelectedPreviewTagName] = useState("");
   const [selectedPreviewCapabilities, setSelectedPreviewCapabilities] =
     useState<PreviewEditableCapabilities | null>(null);
   const [previewEditableValues, setPreviewEditableValues] = useState<PreviewEditableValues>(
@@ -861,6 +969,7 @@ export default function AdminPage() {
   const [savedEditorColors, setSavedEditorColors] = useState<string[]>([]);
   const [previewUndoHistory, setPreviewUndoHistory] = useState<PreviewEditHistoryEntry[]>([]);
   const [previewRedoHistory, setPreviewRedoHistory] = useState<PreviewEditHistoryEntry[]>([]);
+  const [colorPickerDrafts, setColorPickerDrafts] = useState<Record<string, string>>({});
   const [appearanceError, setAppearanceError] = useState("");
   const [appearanceSuccess, setAppearanceSuccess] = useState("");
   const [loadingCms, setLoadingCms] = useState(false);
@@ -903,7 +1012,10 @@ export default function AdminPage() {
   const [isUploadingCmsMedia, setIsUploadingCmsMedia] = useState(false);
   const [isQuickImageUploading, setIsQuickImageUploading] = useState(false);
   const [quickImageUploadFeedback, setQuickImageUploadFeedback] = useState("");
-  const [confirmDialogAction, setConfirmDialogAction] = useState<"discard" | "publish" | null>(null);
+  const [confirmDialogAction, setConfirmDialogAction] = useState<
+    "discard" | "publish" | "delete" | null
+  >(null);
+  const [pendingDeleteAction, setPendingDeleteAction] = useState<PendingDeleteAction | null>(null);
   const [uploadingCustomBlockId, setUploadingCustomBlockId] = useState<string | null>(null);
   const [customBlockUploadError, setCustomBlockUploadError] = useState("");
   const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -971,6 +1083,38 @@ export default function AdminPage() {
   const [isOwner, setIsOwner] = useState<boolean | null>(null);
   const [ownerCheckError, setOwnerCheckError] = useState("");
 
+  const getColorPickerDraftValue = useCallback(
+    (draftKey: string, committedValue: string) => {
+      return toColorInputValue(colorPickerDrafts[draftKey] ?? committedValue);
+    },
+    [colorPickerDrafts],
+  );
+
+  const stageColorPickerValue = useCallback((draftKey: string, value: string) => {
+    setColorPickerDrafts((previous) => ({
+      ...previous,
+      [draftKey]: value,
+    }));
+  }, []);
+
+  const commitColorPickerValue = useCallback(
+    (draftKey: string, committedValue: string, apply: (value: string) => void) => {
+      const nextValue = colorPickerDrafts[draftKey] ?? committedValue;
+      apply(nextValue);
+
+      setColorPickerDrafts((previous) => {
+        if (!(draftKey in previous)) {
+          return previous;
+        }
+
+        const next = { ...previous };
+        delete next[draftKey];
+        return next;
+      });
+    },
+    [colorPickerDrafts],
+  );
+
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -1012,21 +1156,115 @@ export default function AdminPage() {
     );
   }, []);
 
-  const addCmsHomeCustomBlock = useCallback((type: CmsHomeContentBlockType) => {
-    setPreviewPath("/");
-    setCmsHomeDraft((previous) => ({
-      ...previous,
-      customBlocks: [...previous.customBlocks, createCmsHomeContentBlock(type)],
-    }));
+  const positionNewCustomBlockAtViewportCenter = useCallback((blockId: string) => {
+    const frame = previewIframeRef.current;
+    if (!frame?.contentWindow || !frame.contentDocument) {
+      return;
+    }
+
+    const editableId = `home.customBlock.${blockId}`;
+    const maxAttempts = 8;
+
+    const attemptPosition = (attempt = 0) => {
+      const block = frame.contentDocument?.querySelector<HTMLElement>(
+        `[data-cms-editable="${editableId}"]`,
+      );
+
+      if (block) {
+        const rect = block.getBoundingClientRect();
+        const frameRect = frame.getBoundingClientRect();
+        const viewportCenterX = window.innerWidth / 2 - frameRect.left;
+        const viewportCenterY = window.innerHeight / 2 - frameRect.top;
+
+        const nextX = Math.round(viewportCenterX - (rect.left + rect.width / 2));
+        const nextY = Math.round(viewportCenterY - (rect.top + rect.height / 2));
+
+        frame.contentWindow!.postMessage(
+          {
+            type: "cms-preview:editor:apply",
+            payload: {
+              id: editableId,
+              changes: {
+                x: nextX,
+                y: nextY,
+              },
+            },
+          },
+          window.location.origin,
+        );
+        return;
+      }
+
+      if (attempt < maxAttempts) {
+        window.setTimeout(() => attemptPosition(attempt + 1), 120);
+      }
+    };
+
+    window.setTimeout(() => attemptPosition(), 80);
   }, []);
+
+  const addCmsHomeCustomBlock = useCallback((type: CmsHomeContentBlockType) => {
+    const nextBlock = createCmsHomeContentBlock(type);
+    setPreviewPath("/");
+    setCmsHomeDraft((previous) => {
+      const nextCustomBlocks = [...previous.customBlocks, nextBlock];
+
+      setPreviewUndoHistory((previousHistory) => {
+        const nextHistory = [
+          ...previousHistory,
+          {
+            id: "home.customBlocks",
+            before: createInitialPreviewEditableValues(),
+            after: createInitialPreviewEditableValues(),
+            customBlocksBefore: previous.customBlocks,
+            customBlocksAfter: nextCustomBlocks,
+            selectedEditableIdBefore: selectedPreviewEditableId,
+            selectedEditableIdAfter: selectedPreviewEditableId,
+          },
+        ];
+        return nextHistory.slice(-previewEditHistoryLimit);
+      });
+      setPreviewRedoHistory([]);
+
+      return {
+        ...previous,
+        customBlocks: nextCustomBlocks,
+      };
+    });
+
+    if (previewFullscreen) {
+      positionNewCustomBlockAtViewportCenter(nextBlock.id);
+    }
+  }, [positionNewCustomBlockAtViewportCenter, previewFullscreen, selectedPreviewEditableId]);
 
   const removeCmsHomeCustomBlock = useCallback((id: string) => {
     setPreviewPath("/");
-    setCmsHomeDraft((previous) => ({
-      ...previous,
-      customBlocks: previous.customBlocks.filter((block) => block.id !== id),
-    }));
-  }, []);
+    setCmsHomeDraft((previous) => {
+      const nextCustomBlocks = previous.customBlocks.filter((block) => block.id !== id);
+
+      setPreviewUndoHistory((previousHistory) => {
+        const nextHistory = [
+          ...previousHistory,
+          {
+            id: "home.customBlocks",
+            before: createInitialPreviewEditableValues(),
+            after: createInitialPreviewEditableValues(),
+            customBlocksBefore: previous.customBlocks,
+            customBlocksAfter: nextCustomBlocks,
+            selectedEditableIdBefore: selectedPreviewEditableId,
+            selectedEditableIdAfter: selectedPreviewEditableId,
+          },
+        ];
+        return nextHistory.slice(-previewEditHistoryLimit);
+      });
+      setPreviewRedoHistory([]);
+
+      return {
+        ...previous,
+        customBlocks: nextCustomBlocks,
+      };
+    });
+  }, [selectedPreviewEditableId]);
 
   const updateCmsHomeCustomBlock = useCallback(
     (id: string, key: keyof Omit<CmsHomeContentBlockState, "id" | "type">, value: string) => {
@@ -1147,6 +1385,15 @@ export default function AdminPage() {
       const revertSnapshots = new Map<string, PreviewEditableValues>();
 
       for (const entry of previewUndoHistory) {
+        if (
+          entry.customBlocksBefore ||
+          entry.customBlocksAfter ||
+          entry.hiddenEditableIdsBefore ||
+          entry.hiddenEditableIdsAfter
+        ) {
+          continue;
+        }
+
         if (!revertSnapshots.has(entry.id)) {
           revertSnapshots.set(entry.id, entry.before);
         }
@@ -1221,6 +1468,23 @@ export default function AdminPage() {
     return source[selectedNavigationBinding.index] ?? null;
   }, [cmsFooterLinks, cmsHeaderLinks, selectedNavigationBinding]);
 
+  const selectedCustomHomeBlock = useMemo(() => {
+    const blockId = parseCustomHomeBlockEditableId(selectedPreviewEditableId);
+    if (!blockId) {
+      return null;
+    }
+
+    return cmsHomeDraft.customBlocks.find((block) => block.id === blockId) ?? null;
+  }, [cmsHomeDraft.customBlocks, selectedPreviewEditableId]);
+
+  const selectedCustomHomeBlockLabel = useMemo(() => {
+    if (!selectedCustomHomeBlock) {
+      return null;
+    }
+
+    return `Home Custom Block (${selectedCustomHomeBlock.type})`;
+  }, [selectedCustomHomeBlock]);
+
   const getCmsBindingValue = useCallback(
     (binding: CmsEditableBinding, key: "keyEn" | "keyNl") => {
       const fieldName = binding[key];
@@ -1287,6 +1551,52 @@ export default function AdminPage() {
     (asset: CmsMediaAssetRow) => supabase.storage.from(asset.bucket).getPublicUrl(asset.storage_path).data.publicUrl,
     [supabase],
   );
+
+  const syncSelectedImageUrlToDraft = useCallback(
+    (value: string) => {
+      if (selectedCmsBinding?.kind === "image") {
+        setCmsBindingValue(selectedCmsBinding, "keyEn", value);
+      }
+
+      if (selectedCustomHomeBlock?.type === "image") {
+        updateCmsHomeCustomBlock(selectedCustomHomeBlock.id, "imageUrl", value);
+      }
+    },
+    [selectedCmsBinding, selectedCustomHomeBlock, setCmsBindingValue, updateCmsHomeCustomBlock],
+  );
+
+  const hideCmsHomeEditable = useCallback((editableId: string) => {
+    setPreviewPath("/");
+    setCmsHomeDraft((previous) => {
+      if (previous.hiddenEditableIds.includes(editableId)) {
+        return previous;
+      }
+
+      const nextHiddenEditableIds = [...previous.hiddenEditableIds, editableId];
+
+      setPreviewUndoHistory((previousHistory) => {
+        const nextHistory = [
+          ...previousHistory,
+          {
+            id: "home.hiddenEditableIds",
+            before: createInitialPreviewEditableValues(),
+            after: createInitialPreviewEditableValues(),
+            hiddenEditableIdsBefore: previous.hiddenEditableIds,
+            hiddenEditableIdsAfter: nextHiddenEditableIds,
+            selectedEditableIdBefore: selectedPreviewEditableId,
+            selectedEditableIdAfter: "",
+          },
+        ];
+        return nextHistory.slice(-previewEditHistoryLimit);
+      });
+      setPreviewRedoHistory([]);
+
+      return {
+        ...previous,
+        hiddenEditableIds: nextHiddenEditableIds,
+      };
+    });
+  }, [selectedPreviewEditableId]);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(standardOptionStorageKey);
@@ -1422,7 +1732,10 @@ export default function AdminPage() {
 
           const requiredColorFields = [
             "brandName",
+            "logoUrl",
+            "logoColor",
             "colorBg",
+            "colorText",
             "colorInk",
             "colorMuted",
             "colorNeutral100",
@@ -1430,6 +1743,9 @@ export default function AdminPage() {
             "colorNeutral300",
             "colorWood",
             "colorWoodDark",
+            "colorButtonBg",
+            "colorButtonBgHover",
+            "colorButtonText",
           ];
 
           for (const field of requiredColorFields) {
@@ -1449,7 +1765,10 @@ export default function AdminPage() {
                 : "Saved scheme",
             settings: {
               brandName: settings.brandName as string,
+              logoUrl: settings.logoUrl as string,
+              logoColor: settings.logoColor as string,
               colorBg: settings.colorBg as string,
+              colorText: settings.colorText as string,
               colorInk: settings.colorInk as string,
               colorMuted: settings.colorMuted as string,
               colorNeutral100: settings.colorNeutral100 as string,
@@ -1457,6 +1776,9 @@ export default function AdminPage() {
               colorNeutral300: settings.colorNeutral300 as string,
               colorWood: settings.colorWood as string,
               colorWoodDark: settings.colorWoodDark as string,
+              colorButtonBg: settings.colorButtonBg as string,
+              colorButtonBgHover: settings.colorButtonBgHover as string,
+              colorButtonText: settings.colorButtonText as string,
               layoutMode,
               containerWidth,
               sectionSpacing,
@@ -1585,7 +1907,10 @@ export default function AdminPage() {
 
       setAppearanceForm({
         brandName: String(settings.brand_name ?? "Atelier Nord"),
+        logoUrl: String(settings.logo_url ?? ""),
+        logoColor: String(settings.logo_color ?? settings.color_ink ?? "#2b231d"),
         colorBg: String(settings.color_bg ?? "#fbfaf8"),
+        colorText: String(settings.color_text ?? settings.color_ink ?? "#2b231d"),
         colorInk: String(settings.color_ink ?? "#2b231d"),
         colorMuted: String(settings.color_muted ?? "#6f655c"),
         colorNeutral100: String(settings.color_neutral_100 ?? "#f2ede7"),
@@ -1593,6 +1918,9 @@ export default function AdminPage() {
         colorNeutral300: String(settings.color_neutral_300 ?? "#d7cabc"),
         colorWood: String(settings.color_wood ?? "#b88a5b"),
         colorWoodDark: String(settings.color_wood_dark ?? "#7f5534"),
+        colorButtonBg: String(settings.color_button_bg ?? settings.color_wood_dark ?? "#7f5534"),
+        colorButtonBgHover: String(settings.color_button_bg_hover ?? settings.color_wood ?? "#b88a5b"),
+        colorButtonText: String(settings.color_button_text ?? "#ffffff"),
         layoutMode: (settings.layout_mode ?? "balanced") as LayoutMode,
         containerWidth: (settings.container_width ?? "standard") as ContainerWidthMode,
         sectionSpacing: (settings.section_spacing ?? "balanced") as SectionSpacingMode,
@@ -1603,7 +1931,10 @@ export default function AdminPage() {
       });
       setAppearanceDefaultSnapshot({
         brandName: String(settings.brand_name ?? "Atelier Nord"),
+        logoUrl: String(settings.logo_url ?? ""),
+        logoColor: String(settings.logo_color ?? settings.color_ink ?? "#2b231d"),
         colorBg: String(settings.color_bg ?? "#fbfaf8"),
+        colorText: String(settings.color_text ?? settings.color_ink ?? "#2b231d"),
         colorInk: String(settings.color_ink ?? "#2b231d"),
         colorMuted: String(settings.color_muted ?? "#6f655c"),
         colorNeutral100: String(settings.color_neutral_100 ?? "#f2ede7"),
@@ -1611,6 +1942,9 @@ export default function AdminPage() {
         colorNeutral300: String(settings.color_neutral_300 ?? "#d7cabc"),
         colorWood: String(settings.color_wood ?? "#b88a5b"),
         colorWoodDark: String(settings.color_wood_dark ?? "#7f5534"),
+        colorButtonBg: String(settings.color_button_bg ?? settings.color_wood_dark ?? "#7f5534"),
+        colorButtonBgHover: String(settings.color_button_bg_hover ?? settings.color_wood ?? "#b88a5b"),
+        colorButtonText: String(settings.color_button_text ?? "#ffffff"),
         layoutMode: (settings.layout_mode ?? "balanced") as LayoutMode,
         containerWidth: (settings.container_width ?? "standard") as ContainerWidthMode,
         sectionSpacing: (settings.section_spacing ?? "balanced") as SectionSpacingMode,
@@ -1635,7 +1969,7 @@ export default function AdminPage() {
         setSavingAppearance(true);
         setAppearanceError("");
 
-        const basePayload = {
+        const legacyPayload = {
           id: 1,
           brand_name: nextAppearance.brandName.trim() || "Atelier Nord",
           color_bg: nextAppearance.colorBg,
@@ -1653,7 +1987,13 @@ export default function AdminPage() {
         };
 
         const extendedPayload = {
-          ...basePayload,
+          ...legacyPayload,
+          logo_url: nextAppearance.logoUrl.trim(),
+          logo_color: nextAppearance.logoColor,
+          color_text: nextAppearance.colorText,
+          color_button_bg: nextAppearance.colorButtonBg,
+          color_button_bg_hover: nextAppearance.colorButtonBgHover,
+          color_button_text: nextAppearance.colorButtonText,
           font_body: nextAppearance.fontBody,
           font_heading: nextAppearance.fontHeading,
           button_radius: nextAppearance.buttonRadius,
@@ -1664,7 +2004,7 @@ export default function AdminPage() {
           .upsert(extendedPayload);
 
         if (upsertError && /column .* does not exist/i.test(upsertError.message ?? "")) {
-          const retry = await (supabase as any).from("site_settings").upsert(basePayload);
+          const retry = await (supabase as any).from("site_settings").upsert(legacyPayload);
           upsertError = retry.error;
         }
 
@@ -2452,6 +2792,128 @@ export default function AdminPage() {
     [previewEditableValues, selectedPreviewEditableId],
   );
 
+  const handleDeleteSelectedTextTarget = useCallback(
+    (targetEditableId?: string) => {
+      const editableId = targetEditableId ?? selectedPreviewEditableId;
+      if (!editableId) {
+        return false;
+      }
+
+      const customBlockId = parseCustomHomeBlockEditableId(editableId);
+      const customBlock = customBlockId
+        ? (cmsHomeDraft.customBlocks.find((block) => block.id === customBlockId) ?? null)
+        : null;
+
+      if (customBlock) {
+        setPendingDeleteAction({
+          mode: "custom-block",
+          editableId,
+          label: `this ${customBlock.type} block`,
+          blockId: customBlock.id,
+        });
+        setConfirmDialogAction("delete");
+        return true;
+      }
+
+      const binding = cmsEditableBindingMap.get(editableId) ?? null;
+
+      if (binding && binding.section === "home") {
+        setPendingDeleteAction({
+          mode: "home-binding",
+          editableId: binding.id,
+          label: binding.label,
+        });
+        setConfirmDialogAction("delete");
+        return true;
+      }
+
+      if (binding?.kind === "text") {
+        setPendingDeleteAction({
+          mode: "clear-text",
+          editableId,
+          label: binding.label || "this text",
+        });
+        setConfirmDialogAction("delete");
+        return true;
+      }
+
+      return false;
+    },
+    [
+      applyPreviewEditableChanges,
+      cmsEditableBindingMap,
+      cmsHomeDraft.customBlocks,
+      hideCmsHomeEditable,
+      removeCmsHomeCustomBlock,
+      selectedPreviewEditableId,
+      setCmsBindingValue,
+    ],
+  );
+
+  const executePendingDeleteAction = useCallback(() => {
+    if (!pendingDeleteAction) {
+      return;
+    }
+
+    if (pendingDeleteAction.mode === "custom-block") {
+      if (pendingDeleteAction.blockId) {
+        removeCmsHomeCustomBlock(pendingDeleteAction.blockId);
+      }
+      return;
+    }
+
+    if (pendingDeleteAction.mode === "home-binding") {
+      hideCmsHomeEditable(pendingDeleteAction.editableId);
+
+      if (previewIframeRef.current?.contentWindow) {
+        previewIframeRef.current.contentWindow.postMessage(
+          {
+            type: "cms-preview:editor:remove",
+            payload: {
+              id: pendingDeleteAction.editableId,
+            },
+          },
+          window.location.origin,
+        );
+      }
+
+      setSelectedPreviewEditableId("");
+      setSelectedPreviewCapabilities(null);
+      setPreviewEditableValues(createInitialPreviewEditableValues());
+      previewCommittedValuesRef.current.clear();
+      return;
+    }
+
+    const binding = cmsEditableBindingMap.get(pendingDeleteAction.editableId);
+    if (!binding || binding.kind !== "text") {
+      return;
+    }
+
+    setCmsBindingValue(binding, "keyEn", "");
+    if (binding.keyNl) {
+      setCmsBindingValue(binding, "keyNl", "");
+    }
+
+    if (pendingDeleteAction.editableId === selectedPreviewEditableId) {
+      setPreviewEditableValues((previous) => ({ ...previous, text: "" }));
+    }
+
+    applyPreviewEditableChanges(
+      { text: "" },
+      {
+        targetId: pendingDeleteAction.editableId,
+      },
+    );
+  }, [
+    applyPreviewEditableChanges,
+    cmsEditableBindingMap,
+    hideCmsHomeEditable,
+    pendingDeleteAction,
+    removeCmsHomeCustomBlock,
+    selectedPreviewEditableId,
+    setCmsBindingValue,
+  ]);
+
   const handleUndoPreviewChange = useCallback(() => {
     if (previewUndoHistory.length === 0) {
       return;
@@ -2459,6 +2921,73 @@ export default function AdminPage() {
 
     const previousEntry = previewUndoHistory[previewUndoHistory.length - 1];
     setPreviewUndoHistory((previousHistory) => previousHistory.slice(0, -1));
+
+    if (previousEntry.hiddenEditableIdsBefore && previousEntry.hiddenEditableIdsAfter) {
+      setPreviewRedoHistory((previousHistory) => {
+        const nextHistory = [...previousHistory, previousEntry];
+        return nextHistory.slice(-previewEditHistoryLimit);
+      });
+
+      setPreviewPath("/");
+      setCmsHomeDraft((previous) => ({
+        ...previous,
+        hiddenEditableIds: previousEntry.hiddenEditableIdsBefore ?? previous.hiddenEditableIds,
+      }));
+      setSelectedPreviewEditableId(previousEntry.selectedEditableIdBefore ?? "");
+      setSelectedPreviewCapabilities(null);
+      setPreviewEditableValues(createInitialPreviewEditableValues());
+      previewCommittedValuesRef.current.clear();
+      setPreviewFrameVersion((version) => version + 1);
+      return;
+    }
+
+    if (previousEntry.customBlocksBefore && previousEntry.customBlocksAfter) {
+      const layoutAfter: Record<string, { x: number; y: number; width: number; height: number }> = {};
+      const frame = previewIframeRef.current;
+
+      if (frame?.contentDocument) {
+        for (const block of previousEntry.customBlocksAfter) {
+          const editableId = `home.customBlock.${block.id}`;
+          const element = frame.contentDocument.querySelector<HTMLElement>(
+            `[data-cms-editable="${editableId}"]`,
+          );
+
+          if (!element) {
+            continue;
+          }
+
+          const rect = element.getBoundingClientRect();
+          layoutAfter[block.id] = {
+            x: Number(element.dataset.cmsX ?? "0"),
+            y: Number(element.dataset.cmsY ?? "0"),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+          };
+        }
+      }
+
+      const structuralRedoEntry: PreviewEditHistoryEntry = {
+        ...previousEntry,
+        ...(Object.keys(layoutAfter).length > 0 ? { customBlockLayoutAfter: layoutAfter } : {}),
+      };
+
+      setPreviewRedoHistory((previousHistory) => {
+        const nextHistory = [...previousHistory, structuralRedoEntry];
+        return nextHistory.slice(-previewEditHistoryLimit);
+      });
+
+      setPreviewPath("/");
+      setCmsHomeDraft((previous) => ({
+        ...previous,
+        customBlocks: previousEntry.customBlocksBefore ?? previous.customBlocks,
+      }));
+      setSelectedPreviewEditableId(previousEntry.selectedEditableIdBefore ?? "");
+      setSelectedPreviewCapabilities(null);
+      setPreviewEditableValues(createInitialPreviewEditableValues());
+      previewCommittedValuesRef.current.clear();
+      return;
+    }
+
     setPreviewRedoHistory((previousHistory) => {
       const nextHistory = [...previousHistory, previousEntry];
       return nextHistory.slice(-previewEditHistoryLimit);
@@ -2500,6 +3029,78 @@ export default function AdminPage() {
       const nextHistory = [...previousHistory, nextEntry];
       return nextHistory.slice(-previewEditHistoryLimit);
     });
+
+    if (nextEntry.hiddenEditableIdsBefore && nextEntry.hiddenEditableIdsAfter) {
+      setPreviewPath("/");
+      setCmsHomeDraft((previous) => ({
+        ...previous,
+        hiddenEditableIds: nextEntry.hiddenEditableIdsAfter ?? previous.hiddenEditableIds,
+      }));
+      setSelectedPreviewEditableId(nextEntry.selectedEditableIdAfter ?? "");
+      setSelectedPreviewCapabilities(null);
+      setPreviewEditableValues(createInitialPreviewEditableValues());
+      previewCommittedValuesRef.current.clear();
+      setPreviewFrameVersion((version) => version + 1);
+      return;
+    }
+
+    if (nextEntry.customBlocksBefore && nextEntry.customBlocksAfter) {
+      setPreviewPath("/");
+      setCmsHomeDraft((previous) => ({
+        ...previous,
+        customBlocks: nextEntry.customBlocksAfter ?? previous.customBlocks,
+      }));
+
+      const frame = previewIframeRef.current;
+      const layoutAfter = nextEntry.customBlockLayoutAfter;
+      if (frame?.contentWindow && layoutAfter && Object.keys(layoutAfter).length > 0) {
+        const maxAttempts = 8;
+
+        const attemptApplyLayout = (attempt = 0) => {
+          let hasPending = false;
+
+          for (const [blockId, layout] of Object.entries(layoutAfter)) {
+            const editableId = `home.customBlock.${blockId}`;
+            const element = frame.contentDocument?.querySelector<HTMLElement>(
+              `[data-cms-editable="${editableId}"]`,
+            );
+
+            if (!element) {
+              hasPending = true;
+              continue;
+            }
+
+            frame.contentWindow!.postMessage(
+              {
+                type: "cms-preview:editor:apply",
+                payload: {
+                  id: editableId,
+                  changes: {
+                    x: layout.x,
+                    y: layout.y,
+                    width: layout.width,
+                    height: layout.height,
+                  },
+                },
+              },
+              window.location.origin,
+            );
+          }
+
+          if (hasPending && attempt < maxAttempts) {
+            window.setTimeout(() => attemptApplyLayout(attempt + 1), 120);
+          }
+        };
+
+        window.setTimeout(() => attemptApplyLayout(), 80);
+      }
+
+      setSelectedPreviewEditableId(nextEntry.selectedEditableIdAfter ?? "");
+      setSelectedPreviewCapabilities(null);
+      setPreviewEditableValues(createInitialPreviewEditableValues());
+      previewCommittedValuesRef.current.clear();
+      return;
+    }
 
     setVisualEditorEnabled(true);
     setSelectedPreviewEditableId(nextEntry.id);
@@ -2598,9 +3199,7 @@ export default function AdminPage() {
         }));
         applyPreviewEditableChanges({ imageUrl: publicUrl });
 
-        if (selectedCmsBinding?.kind === "image") {
-          setCmsBindingValue(selectedCmsBinding, "keyEn", publicUrl);
-        }
+        syncSelectedImageUrlToDraft(publicUrl);
 
         await fetchCmsWorkspace();
         setQuickImageUploadFeedback("Upload complete: image replaced successfully.");
@@ -2615,9 +3214,8 @@ export default function AdminPage() {
     [
       applyPreviewEditableChanges,
       fetchCmsWorkspace,
-      selectedCmsBinding,
       session,
-      setCmsBindingValue,
+      syncSelectedImageUrlToDraft,
       supabase,
     ],
   );
@@ -2651,6 +3249,13 @@ export default function AdminPage() {
 
       const key = event.key.toLowerCase();
       const modifierPressed = event.ctrlKey || event.metaKey;
+
+      if (key === "delete" || key === "backspace") {
+        if (handleDeleteSelectedTextTarget()) {
+          event.preventDefault();
+          return;
+        }
+      }
 
       if (!modifierPressed) {
         return;
@@ -2708,6 +3313,7 @@ export default function AdminPage() {
     handleRedoPreviewChange,
     handleUndoAppearanceChange,
     handleUndoPreviewChange,
+    handleDeleteSelectedTextTarget,
     visualEditorEnabled,
   ]);
 
@@ -2757,7 +3363,23 @@ export default function AdminPage() {
       },
       window.location.origin,
     );
-  }, [appearanceForm, cmsHomeDraft.customBlocks, previewGridEnabled, visualEditorEnabled]);
+
+    previewIframeRef.current.contentWindow.postMessage(
+      {
+        type: "cms-preview:hidden-editables",
+        payload: {
+          ids: cmsHomeDraft.hiddenEditableIds,
+        },
+      },
+      window.location.origin,
+    );
+  }, [
+    appearanceForm,
+    cmsHomeDraft.customBlocks,
+    cmsHomeDraft.hiddenEditableIds,
+    previewGridEnabled,
+    visualEditorEnabled,
+  ]);
 
   useEffect(() => {
     if (activeAdminTab === "appearance") {
@@ -2924,6 +3546,7 @@ export default function AdminPage() {
             type: "cms-preview:selected";
             payload: {
               id: string;
+              tagName: string;
               capabilities: PreviewEditableCapabilities;
               values: PreviewEditableValues;
             };
@@ -2937,11 +3560,18 @@ export default function AdminPage() {
               width?: number;
               height?: number;
             };
+          }
+        | {
+            type: "cms-preview:editor:delete-selected";
+            payload: {
+              id: string;
+            };
           };
 
       if (message.type === "cms-preview:selected") {
         previewCommittedValuesRef.current.set(message.payload.id, message.payload.values);
         setSelectedPreviewEditableId(message.payload.id);
+        setSelectedPreviewTagName(message.payload.tagName);
         setSelectedPreviewCapabilities(message.payload.capabilities);
         setPreviewEditableValues(message.payload.values);
         return;
@@ -3022,6 +3652,11 @@ export default function AdminPage() {
           width: message.payload.width ?? previous.width,
           height: message.payload.height ?? previous.height,
         }));
+        return;
+      }
+
+      if (message.type === "cms-preview:editor:delete-selected") {
+        handleDeleteSelectedTextTarget(message.payload.id);
       }
     };
 
@@ -3034,10 +3669,16 @@ export default function AdminPage() {
       previewMoveHistoryTimerRef.current = null;
       previewMoveHistoryDraftRef.current = null;
     };
+  }, [handleDeleteSelectedTextTarget, selectedPreviewEditableId]);
+
+  useEffect(() => {
+    if (!selectedPreviewEditableId) {
+      setSelectedPreviewTagName("");
+    }
   }, [selectedPreviewEditableId]);
 
   useEffect(() => {
-    if (!selectedCmsBinding && !selectedNavigationRow) {
+    if (!selectedCmsBinding && !selectedNavigationRow && !selectedCustomHomeBlock) {
       return;
     }
 
@@ -3050,8 +3691,10 @@ export default function AdminPage() {
         ? { imageUrl: getCmsBindingValue(selectedCmsBinding, "keyEn") }
         : {}),
       ...(selectedNavigationRow ? { text: selectedNavigationRow.label } : {}),
+      ...(selectedCustomHomeBlock?.type === "text" ? { text: selectedCustomHomeBlock.text } : {}),
+      ...(selectedCustomHomeBlock?.type === "image" ? { imageUrl: selectedCustomHomeBlock.imageUrl } : {}),
     }));
-  }, [getCmsBindingValue, selectedCmsBinding, selectedNavigationRow]);
+  }, [getCmsBindingValue, selectedCmsBinding, selectedCustomHomeBlock, selectedNavigationRow]);
 
   const handleCreateCategory = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -4038,7 +4681,7 @@ export default function AdminPage() {
                   Selected target
                 </p>
                 <p className="mt-1 text-sm font-medium text-[var(--color-ink)]">
-                  {selectedCmsBinding?.label || selectedNavigationBinding?.label || selectedPreviewEditableId || "Nothing selected yet"}
+                  {selectedCmsBinding?.label || selectedNavigationBinding?.label || selectedCustomHomeBlockLabel || selectedPreviewEditableId || "Nothing selected yet"}
                 </p>
 
                 {selectedPreviewEditableId && selectedPreviewCapabilities ? (
@@ -4113,7 +4756,7 @@ export default function AdminPage() {
                       </>
                     ) : null}
 
-                    {selectedCmsBinding?.kind === "text" ? (
+                    {selectedCmsBinding?.kind === "text" || selectedCustomHomeBlock?.type === "text" ? (
                       <>
                         <div>
                           <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
@@ -4121,16 +4764,27 @@ export default function AdminPage() {
                           </label>
                           <input
                             className={fieldClassName}
-                            value={getCmsBindingValue(selectedCmsBinding, "keyEn")}
+                            value={
+                              selectedCmsBinding?.kind === "text"
+                                ? getCmsBindingValue(selectedCmsBinding, "keyEn")
+                                : selectedCustomHomeBlock?.text ?? ""
+                            }
                             onChange={(event) => {
                               const value = event.target.value;
-                              setCmsBindingValue(selectedCmsBinding, "keyEn", value);
+                              if (selectedCmsBinding?.kind === "text") {
+                                setCmsBindingValue(selectedCmsBinding, "keyEn", value);
+                              }
+
+                              if (selectedCustomHomeBlock?.type === "text") {
+                                updateCmsHomeCustomBlock(selectedCustomHomeBlock.id, "text", value);
+                              }
+
                               setPreviewEditableValues((previous) => ({ ...previous, text: value }));
                               applyPreviewEditableChanges({ text: value });
                             }}
                           />
                         </div>
-                        {selectedCmsBinding.keyNl ? (
+                        {selectedCmsBinding?.keyNl ? (
                           <div>
                             <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
                               Draft Nederlands
@@ -4150,7 +4804,7 @@ export default function AdminPage() {
                     {selectedPreviewCapabilities.color ? (
                       <div>
                         <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-                          Text color
+                          {selectedPreviewTagName === "BUTTON" ? "Button text color" : "Text color"}
                         </label>
                         <div className="mt-1 flex items-center gap-2">
                           <input
@@ -4160,8 +4814,13 @@ export default function AdminPage() {
                             onChange={(event) => {
                               const value = event.target.value;
                               setPreviewEditableValues((previous) => ({ ...previous, color: value }));
-                              applyPreviewEditableChanges({ color: value });
                             }}
+                            onPointerUp={() =>
+                              applyColorFieldChange("color", previewEditableValues.color, applyPreviewEditableChanges)
+                            }
+                            onBlur={() =>
+                              applyColorFieldChange("color", previewEditableValues.color, applyPreviewEditableChanges)
+                            }
                           />
                           <button
                             type="button"
@@ -4192,7 +4851,7 @@ export default function AdminPage() {
                     {selectedPreviewCapabilities.background ? (
                       <div>
                         <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-                          Background color
+                          {selectedPreviewTagName === "BUTTON" ? "Button color" : "Background color"}
                         </label>
                         <div className="mt-1 flex items-center gap-2">
                           <input
@@ -4207,8 +4866,21 @@ export default function AdminPage() {
                             onChange={(event) => {
                               const value = event.target.value;
                               setPreviewEditableValues((previous) => ({ ...previous, backgroundColor: value }));
-                              applyPreviewEditableChanges({ backgroundColor: value });
                             }}
+                            onPointerUp={() =>
+                              applyColorFieldChange(
+                                "backgroundColor",
+                                previewEditableValues.backgroundColor,
+                                applyPreviewEditableChanges,
+                              )
+                            }
+                            onBlur={() =>
+                              applyColorFieldChange(
+                                "backgroundColor",
+                                previewEditableValues.backgroundColor,
+                                applyPreviewEditableChanges,
+                              )
+                            }
                           />
                           <button
                             type="button"
@@ -4289,9 +4961,7 @@ export default function AdminPage() {
                           }
                           onBlur={() => {
                             applyPreviewEditableChanges({ imageUrl: previewEditableValues.imageUrl });
-                            if (selectedCmsBinding?.kind === "image") {
-                              setCmsBindingValue(selectedCmsBinding, "keyEn", previewEditableValues.imageUrl);
-                            }
+                            syncSelectedImageUrlToDraft(previewEditableValues.imageUrl);
                           }}
                         />
 
@@ -4319,9 +4989,7 @@ export default function AdminPage() {
                                         imageUrl: publicUrl,
                                       }));
                                       applyPreviewEditableChanges({ imageUrl: publicUrl });
-                                      if (selectedCmsBinding?.kind === "image") {
-                                        setCmsBindingValue(selectedCmsBinding, "keyEn", publicUrl);
-                                      }
+                                      syncSelectedImageUrlToDraft(publicUrl);
                                     }}
                                     title={asset.storage_path}
                                   >
@@ -4367,6 +5035,21 @@ export default function AdminPage() {
                             }}
                           />
                         </div>
+                      </div>
+                    ) : null}
+
+                    {selectedCustomHomeBlock || selectedCmsBinding?.section === "home" || selectedCmsBinding?.kind === "text" ? (
+                      <div className="mt-4 pt-3 border-t border-black/10">
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          onClick={handleDeleteSelectedTextTarget}
+                          className="w-full"
+                        >
+                          {selectedCustomHomeBlock || selectedCmsBinding?.section === "home"
+                            ? "Delete Block"
+                            : "Clear Text"}
+                        </Button>
                       </div>
                     ) : null}
                   </div>
@@ -4451,14 +5134,36 @@ export default function AdminPage() {
                               <input
                                 type="color"
                                 className={`${fieldClassName} h-12`}
-                                value={
+                                value={getColorPickerDraftValue(
+                                  `cms.custom-block.${block.id}.backgroundColor`,
                                   block.backgroundColor === "transparent"
                                     ? "#ffffff"
-                                    : block.backgroundColor || "#ffffff"
-                                }
+                                    : block.backgroundColor || "#ffffff",
+                                )}
                                 disabled={block.backgroundColor === "transparent"}
                                 onChange={(event) =>
-                                  updateCmsHomeCustomBlock(block.id, "backgroundColor", event.target.value)
+                                  stageColorPickerValue(
+                                    `cms.custom-block.${block.id}.backgroundColor`,
+                                    event.target.value,
+                                  )
+                                }
+                                onPointerUp={() =>
+                                  commitColorPickerValue(
+                                    `cms.custom-block.${block.id}.backgroundColor`,
+                                    block.backgroundColor === "transparent"
+                                      ? "#ffffff"
+                                      : block.backgroundColor || "#ffffff",
+                                    (value) => updateCmsHomeCustomBlock(block.id, "backgroundColor", value),
+                                  )
+                                }
+                                onBlur={() =>
+                                  commitColorPickerValue(
+                                    `cms.custom-block.${block.id}.backgroundColor`,
+                                    block.backgroundColor === "transparent"
+                                      ? "#ffffff"
+                                      : block.backgroundColor || "#ffffff",
+                                    (value) => updateCmsHomeCustomBlock(block.id, "backgroundColor", value),
+                                  )
                                 }
                               />
                               <label className="mt-2 flex items-center gap-2 text-xs text-[var(--color-muted)]">
@@ -4579,14 +5284,36 @@ export default function AdminPage() {
                               <input
                                 type="color"
                                 className={`${fieldClassName} h-12`}
-                                value={
+                                value={getColorPickerDraftValue(
+                                  `cms.custom-block.${block.id}.backgroundColor`,
                                   block.backgroundColor === "transparent"
                                     ? "#ffffff"
-                                    : block.backgroundColor || "#ffffff"
-                                }
+                                    : block.backgroundColor || "#ffffff",
+                                )}
                                 disabled={block.backgroundColor === "transparent"}
                                 onChange={(event) =>
-                                  updateCmsHomeCustomBlock(block.id, "backgroundColor", event.target.value)
+                                  stageColorPickerValue(
+                                    `cms.custom-block.${block.id}.backgroundColor`,
+                                    event.target.value,
+                                  )
+                                }
+                                onPointerUp={() =>
+                                  commitColorPickerValue(
+                                    `cms.custom-block.${block.id}.backgroundColor`,
+                                    block.backgroundColor === "transparent"
+                                      ? "#ffffff"
+                                      : block.backgroundColor || "#ffffff",
+                                    (value) => updateCmsHomeCustomBlock(block.id, "backgroundColor", value),
+                                  )
+                                }
+                                onBlur={() =>
+                                  commitColorPickerValue(
+                                    `cms.custom-block.${block.id}.backgroundColor`,
+                                    block.backgroundColor === "transparent"
+                                      ? "#ffffff"
+                                      : block.backgroundColor || "#ffffff",
+                                    (value) => updateCmsHomeCustomBlock(block.id, "backgroundColor", value),
+                                  )
                                 }
                               />
                               <label className="mt-2 flex items-center gap-2 text-xs text-[var(--color-muted)]">
@@ -4708,8 +5435,18 @@ export default function AdminPage() {
                   <input
                     type="color"
                     className="mt-2 h-10 w-full cursor-pointer rounded-lg border border-black/10"
-                    value={toColorInputValue(appearanceForm.colorBg)}
-                    onChange={(event) => updateAppearanceField("colorBg", event.target.value)}
+                    value={getColorPickerDraftValue("appearance.colorBg", appearanceForm.colorBg)}
+                    onChange={(event) => stageColorPickerValue("appearance.colorBg", event.target.value)}
+                    onPointerUp={() =>
+                      commitColorPickerValue("appearance.colorBg", appearanceForm.colorBg, (value) =>
+                        updateAppearanceField("colorBg", value),
+                      )
+                    }
+                    onBlur={() =>
+                      commitColorPickerValue("appearance.colorBg", appearanceForm.colorBg, (value) =>
+                        updateAppearanceField("colorBg", value),
+                      )
+                    }
                   />
                 </label>
 
@@ -4720,8 +5457,18 @@ export default function AdminPage() {
                   <input
                     type="color"
                     className="mt-2 h-10 w-full cursor-pointer rounded-lg border border-black/10"
-                    value={toColorInputValue(appearanceForm.colorInk)}
-                    onChange={(event) => updateAppearanceField("colorInk", event.target.value)}
+                    value={getColorPickerDraftValue("appearance.colorText", appearanceForm.colorText)}
+                    onChange={(event) => stageColorPickerValue("appearance.colorText", event.target.value)}
+                    onPointerUp={() =>
+                      commitColorPickerValue("appearance.colorText", appearanceForm.colorText, (value) =>
+                        updateAppearanceField("colorText", value),
+                      )
+                    }
+                    onBlur={() =>
+                      commitColorPickerValue("appearance.colorText", appearanceForm.colorText, (value) =>
+                        updateAppearanceField("colorText", value),
+                      )
+                    }
                   />
                 </label>
 
@@ -4732,8 +5479,24 @@ export default function AdminPage() {
                   <input
                     type="color"
                     className="mt-2 h-10 w-full cursor-pointer rounded-lg border border-black/10"
-                    value={toColorInputValue(appearanceForm.colorWood)}
-                    onChange={(event) => updateAppearanceField("colorWood", event.target.value)}
+                    value={getColorPickerDraftValue("appearance.colorButtonBg", appearanceForm.colorButtonBg)}
+                    onChange={(event) =>
+                      stageColorPickerValue("appearance.colorButtonBg", event.target.value)
+                    }
+                    onPointerUp={() =>
+                      commitColorPickerValue(
+                        "appearance.colorButtonBg",
+                        appearanceForm.colorButtonBg,
+                        (value) => updateAppearanceField("colorButtonBg", value),
+                      )
+                    }
+                    onBlur={() =>
+                      commitColorPickerValue(
+                        "appearance.colorButtonBg",
+                        appearanceForm.colorButtonBg,
+                        (value) => updateAppearanceField("colorButtonBg", value),
+                      )
+                    }
                   />
                 </label>
 
@@ -4751,6 +5514,105 @@ export default function AdminPage() {
                     <option value="8px">Soft</option>
                     <option value="0px">Square</option>
                   </select>
+                </label>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <label className="rounded-xl border border-black/10 bg-white p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                    Logo Color
+                  </p>
+                  <input
+                    type="color"
+                    className="mt-2 h-10 w-full cursor-pointer rounded-lg border border-black/10"
+                    value={getColorPickerDraftValue("appearance.logoColor", appearanceForm.logoColor)}
+                    onChange={(event) => stageColorPickerValue("appearance.logoColor", event.target.value)}
+                    onPointerUp={() =>
+                      commitColorPickerValue("appearance.logoColor", appearanceForm.logoColor, (value) =>
+                        updateAppearanceField("logoColor", value),
+                      )
+                    }
+                    onBlur={() =>
+                      commitColorPickerValue("appearance.logoColor", appearanceForm.logoColor, (value) =>
+                        updateAppearanceField("logoColor", value),
+                      )
+                    }
+                  />
+                </label>
+
+                <label className="rounded-xl border border-black/10 bg-white p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                    Button Hover
+                  </p>
+                  <input
+                    type="color"
+                    className="mt-2 h-10 w-full cursor-pointer rounded-lg border border-black/10"
+                    value={getColorPickerDraftValue(
+                      "appearance.colorButtonBgHover",
+                      appearanceForm.colorButtonBgHover,
+                    )}
+                    onChange={(event) =>
+                      stageColorPickerValue("appearance.colorButtonBgHover", event.target.value)
+                    }
+                    onPointerUp={() =>
+                      commitColorPickerValue(
+                        "appearance.colorButtonBgHover",
+                        appearanceForm.colorButtonBgHover,
+                        (value) => updateAppearanceField("colorButtonBgHover", value),
+                      )
+                    }
+                    onBlur={() =>
+                      commitColorPickerValue(
+                        "appearance.colorButtonBgHover",
+                        appearanceForm.colorButtonBgHover,
+                        (value) => updateAppearanceField("colorButtonBgHover", value),
+                      )
+                    }
+                  />
+                </label>
+
+                <label className="rounded-xl border border-black/10 bg-white p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                    Button Text
+                  </p>
+                  <input
+                    type="color"
+                    className="mt-2 h-10 w-full cursor-pointer rounded-lg border border-black/10"
+                    value={getColorPickerDraftValue(
+                      "appearance.colorButtonText",
+                      appearanceForm.colorButtonText,
+                    )}
+                    onChange={(event) =>
+                      stageColorPickerValue("appearance.colorButtonText", event.target.value)
+                    }
+                    onPointerUp={() =>
+                      commitColorPickerValue(
+                        "appearance.colorButtonText",
+                        appearanceForm.colorButtonText,
+                        (value) => updateAppearanceField("colorButtonText", value),
+                      )
+                    }
+                    onBlur={() =>
+                      commitColorPickerValue(
+                        "appearance.colorButtonText",
+                        appearanceForm.colorButtonText,
+                        (value) => updateAppearanceField("colorButtonText", value),
+                      )
+                    }
+                  />
+                </label>
+
+                <label className="rounded-xl border border-black/10 bg-white p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+                    Logo URL
+                  </p>
+                  <input
+                    type="url"
+                    className={`${fieldClassName} mt-2`}
+                    placeholder="https://example.com/logo.svg"
+                    value={appearanceForm.logoUrl}
+                    onChange={(event) => updateAppearanceField("logoUrl", event.target.value)}
+                  />
                 </label>
               </div>
 
@@ -5051,7 +5913,7 @@ export default function AdminPage() {
                       Quick Editor (Drag Me)
                     </p>
                     <p className="mt-1 text-sm font-medium text-[var(--color-ink)]">
-                      {selectedCmsBinding?.label || selectedNavigationBinding?.label || selectedPreviewEditableId || "Select an element in preview"}
+                      {selectedCmsBinding?.label || selectedNavigationBinding?.label || selectedCustomHomeBlockLabel || selectedPreviewEditableId || "Select an element in preview"}
                     </p>
                   </div>
 
@@ -5075,7 +5937,7 @@ export default function AdminPage() {
                           {selectedPreviewCapabilities.color ? (
                             <div>
                               <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-                                Text color
+                                {selectedPreviewTagName === "BUTTON" ? "Button text color" : "Text color"}
                               </label>
                               <div className="mt-1 flex items-center gap-2">
                                 <input
@@ -5085,8 +5947,21 @@ export default function AdminPage() {
                                   onChange={(event) => {
                                     const value = event.target.value;
                                     setPreviewEditableValues((previous) => ({ ...previous, color: value }));
-                                    applyPreviewEditableChanges({ color: value });
                                   }}
+                                  onPointerUp={() =>
+                                    applyColorFieldChange(
+                                      "color",
+                                      previewEditableValues.color,
+                                      applyPreviewEditableChanges,
+                                    )
+                                  }
+                                  onBlur={() =>
+                                    applyColorFieldChange(
+                                      "color",
+                                      previewEditableValues.color,
+                                      applyPreviewEditableChanges,
+                                    )
+                                  }
                                 />
                                 <button
                                   type="button"
@@ -5203,20 +6078,31 @@ export default function AdminPage() {
                         </>
                       ) : null}
 
-                      {selectedCmsBinding?.kind === "text" ? (
+                      {selectedCmsBinding?.kind === "text" || selectedCustomHomeBlock?.type === "text" ? (
                         <>
                           <input
                             className={fieldClassName}
-                            value={getCmsBindingValue(selectedCmsBinding, "keyEn")}
+                            value={
+                              selectedCmsBinding?.kind === "text"
+                                ? getCmsBindingValue(selectedCmsBinding, "keyEn")
+                                : selectedCustomHomeBlock?.text ?? ""
+                            }
                             placeholder="Draft English"
                             onChange={(event) => {
                               const value = event.target.value;
-                              setCmsBindingValue(selectedCmsBinding, "keyEn", value);
+                              if (selectedCmsBinding?.kind === "text") {
+                                setCmsBindingValue(selectedCmsBinding, "keyEn", value);
+                              }
+
+                              if (selectedCustomHomeBlock?.type === "text") {
+                                updateCmsHomeCustomBlock(selectedCustomHomeBlock.id, "text", value);
+                              }
+
                               setPreviewEditableValues((previous) => ({ ...previous, text: value }));
                               applyPreviewEditableChanges({ text: value });
                             }}
                           />
-                          {selectedCmsBinding.keyNl ? (
+                          {selectedCmsBinding?.keyNl ? (
                             <input
                               className={fieldClassName}
                               value={getCmsBindingValue(selectedCmsBinding, "keyNl")}
@@ -5230,7 +6116,7 @@ export default function AdminPage() {
                       {selectedPreviewCapabilities.background ? (
                         <div>
                           <label className="text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
-                            Background color
+                            {selectedPreviewTagName === "BUTTON" ? "Button color" : "Background color"}
                           </label>
                           <div className="mt-1 flex items-center gap-2">
                             <input
@@ -5245,8 +6131,21 @@ export default function AdminPage() {
                               onChange={(event) => {
                                 const value = event.target.value;
                                 setPreviewEditableValues((previous) => ({ ...previous, backgroundColor: value }));
-                                applyPreviewEditableChanges({ backgroundColor: value });
                               }}
+                              onPointerUp={() =>
+                                applyColorFieldChange(
+                                  "backgroundColor",
+                                  previewEditableValues.backgroundColor,
+                                  applyPreviewEditableChanges,
+                                )
+                              }
+                              onBlur={() =>
+                                applyColorFieldChange(
+                                  "backgroundColor",
+                                  previewEditableValues.backgroundColor,
+                                  applyPreviewEditableChanges,
+                                )
+                              }
                             />
                             <button
                               type="button"
@@ -5381,11 +6280,24 @@ export default function AdminPage() {
                             }
                             onBlur={() => {
                               applyPreviewEditableChanges({ imageUrl: previewEditableValues.imageUrl });
-                              if (selectedCmsBinding?.kind === "image") {
-                                setCmsBindingValue(selectedCmsBinding, "keyEn", previewEditableValues.imageUrl);
-                              }
+                              syncSelectedImageUrlToDraft(previewEditableValues.imageUrl);
                             }}
                           />
+                        </div>
+                      ) : null}
+
+                      {selectedCustomHomeBlock || selectedCmsBinding?.section === "home" || selectedCmsBinding?.kind === "text" ? (
+                        <div className="mt-4 pt-3 border-t border-black/10">
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={handleDeleteSelectedTextTarget}
+                            className="w-full"
+                          >
+                            {selectedCustomHomeBlock || selectedCmsBinding?.section === "home"
+                              ? "Delete Block"
+                              : "Clear Text"}
+                          </Button>
                         </div>
                       ) : null}
                     </div>
@@ -5394,6 +6306,213 @@ export default function AdminPage() {
                       Click any outlined element in the preview to edit it here.
                     </p>
                   )}
+
+                  <div className="mt-3 rounded-xl border border-black/10 bg-[var(--color-neutral-100)]/50 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-muted)]">
+                          Global Style
+                        </p>
+                        <p className="mt-1 text-[11px] text-[var(--color-muted)]">
+                          Edit theme, logo, and button colors without leaving fullscreen.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => void saveAppearanceSettings(appearanceForm)}
+                        disabled={savingAppearance || !appearanceDirty}
+                      >
+                        {savingAppearance ? "Saving..." : "Save"}
+                      </Button>
+                    </div>
+
+                    <div className="mt-3 grid gap-2">
+                      <input
+                        className={fieldClassName}
+                        value={appearanceForm.brandName}
+                        placeholder="Brand name"
+                        onChange={(event) => updateAppearanceField("brandName", event.target.value)}
+                      />
+
+                      <input
+                        className={fieldClassName}
+                        value={appearanceForm.logoUrl}
+                        placeholder="Logo URL"
+                        onChange={(event) => updateAppearanceField("logoUrl", event.target.value)}
+                      />
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="rounded-lg border border-black/10 bg-white p-2 text-[11px] font-medium text-[var(--color-muted)]">
+                          Background
+                          <input
+                            type="color"
+                            className="mt-1 h-9 w-full cursor-pointer rounded-md border border-black/10"
+                            value={getColorPickerDraftValue("appearance.colorBg", appearanceForm.colorBg)}
+                            onChange={(event) =>
+                              stageColorPickerValue("appearance.colorBg", event.target.value)
+                            }
+                            onPointerUp={() =>
+                              commitColorPickerValue("appearance.colorBg", appearanceForm.colorBg, (value) =>
+                                updateAppearanceField("colorBg", value),
+                              )
+                            }
+                            onBlur={() =>
+                              commitColorPickerValue("appearance.colorBg", appearanceForm.colorBg, (value) =>
+                                updateAppearanceField("colorBg", value),
+                              )
+                            }
+                          />
+                        </label>
+
+                        <label className="rounded-lg border border-black/10 bg-white p-2 text-[11px] font-medium text-[var(--color-muted)]">
+                          Main Text
+                          <input
+                            type="color"
+                            className="mt-1 h-9 w-full cursor-pointer rounded-md border border-black/10"
+                            value={getColorPickerDraftValue("appearance.colorText", appearanceForm.colorText)}
+                            onChange={(event) =>
+                              stageColorPickerValue("appearance.colorText", event.target.value)
+                            }
+                            onPointerUp={() =>
+                              commitColorPickerValue(
+                                "appearance.colorText",
+                                appearanceForm.colorText,
+                                (value) => updateAppearanceField("colorText", value),
+                              )
+                            }
+                            onBlur={() =>
+                              commitColorPickerValue(
+                                "appearance.colorText",
+                                appearanceForm.colorText,
+                                (value) => updateAppearanceField("colorText", value),
+                              )
+                            }
+                          />
+                        </label>
+
+                        <label className="rounded-lg border border-black/10 bg-white p-2 text-[11px] font-medium text-[var(--color-muted)]">
+                          Logo
+                          <input
+                            type="color"
+                            className="mt-1 h-9 w-full cursor-pointer rounded-md border border-black/10"
+                            value={getColorPickerDraftValue("appearance.logoColor", appearanceForm.logoColor)}
+                            onChange={(event) =>
+                              stageColorPickerValue("appearance.logoColor", event.target.value)
+                            }
+                            onPointerUp={() =>
+                              commitColorPickerValue("appearance.logoColor", appearanceForm.logoColor, (value) =>
+                                updateAppearanceField("logoColor", value),
+                              )
+                            }
+                            onBlur={() =>
+                              commitColorPickerValue("appearance.logoColor", appearanceForm.logoColor, (value) =>
+                                updateAppearanceField("logoColor", value),
+                              )
+                            }
+                          />
+                        </label>
+
+                        <label className="rounded-lg border border-black/10 bg-white p-2 text-[11px] font-medium text-[var(--color-muted)]">
+                          Button
+                          <input
+                            type="color"
+                            className="mt-1 h-9 w-full cursor-pointer rounded-md border border-black/10"
+                            value={getColorPickerDraftValue(
+                              "appearance.colorButtonBg",
+                              appearanceForm.colorButtonBg,
+                            )}
+                            onChange={(event) =>
+                              stageColorPickerValue("appearance.colorButtonBg", event.target.value)
+                            }
+                            onPointerUp={() =>
+                              commitColorPickerValue(
+                                "appearance.colorButtonBg",
+                                appearanceForm.colorButtonBg,
+                                (value) => updateAppearanceField("colorButtonBg", value),
+                              )
+                            }
+                            onBlur={() =>
+                              commitColorPickerValue(
+                                "appearance.colorButtonBg",
+                                appearanceForm.colorButtonBg,
+                                (value) => updateAppearanceField("colorButtonBg", value),
+                              )
+                            }
+                          />
+                        </label>
+
+                        <label className="rounded-lg border border-black/10 bg-white p-2 text-[11px] font-medium text-[var(--color-muted)]">
+                          Button Hover
+                          <input
+                            type="color"
+                            className="mt-1 h-9 w-full cursor-pointer rounded-md border border-black/10"
+                            value={getColorPickerDraftValue(
+                              "appearance.colorButtonBgHover",
+                              appearanceForm.colorButtonBgHover,
+                            )}
+                            onChange={(event) =>
+                              stageColorPickerValue("appearance.colorButtonBgHover", event.target.value)
+                            }
+                            onPointerUp={() =>
+                              commitColorPickerValue(
+                                "appearance.colorButtonBgHover",
+                                appearanceForm.colorButtonBgHover,
+                                (value) => updateAppearanceField("colorButtonBgHover", value),
+                              )
+                            }
+                            onBlur={() =>
+                              commitColorPickerValue(
+                                "appearance.colorButtonBgHover",
+                                appearanceForm.colorButtonBgHover,
+                                (value) => updateAppearanceField("colorButtonBgHover", value),
+                              )
+                            }
+                          />
+                        </label>
+
+                        <label className="rounded-lg border border-black/10 bg-white p-2 text-[11px] font-medium text-[var(--color-muted)]">
+                          Button Text
+                          <input
+                            type="color"
+                            className="mt-1 h-9 w-full cursor-pointer rounded-md border border-black/10"
+                            value={getColorPickerDraftValue(
+                              "appearance.colorButtonText",
+                              appearanceForm.colorButtonText,
+                            )}
+                            onChange={(event) =>
+                              stageColorPickerValue("appearance.colorButtonText", event.target.value)
+                            }
+                            onPointerUp={() =>
+                              commitColorPickerValue(
+                                "appearance.colorButtonText",
+                                appearanceForm.colorButtonText,
+                                (value) => updateAppearanceField("colorButtonText", value),
+                              )
+                            }
+                            onBlur={() =>
+                              commitColorPickerValue(
+                                "appearance.colorButtonText",
+                                appearanceForm.colorButtonText,
+                                (value) => updateAppearanceField("colorButtonText", value),
+                              )
+                            }
+                          />
+                        </label>
+                      </div>
+
+                      <select
+                        className={fieldClassName}
+                        value={appearanceForm.buttonRadius}
+                        onChange={(event) => updateAppearanceField("buttonRadius", event.target.value)}
+                      >
+                        <option value="9999px">Button Shape: Pill</option>
+                        <option value="16px">Button Shape: Rounded</option>
+                        <option value="8px">Button Shape: Soft</option>
+                        <option value="0px">Button Shape: Square</option>
+                      </select>
+                    </div>
+                  </div>
 
                   <div className="mt-3 rounded-xl border border-black/10 bg-[var(--color-neutral-100)]/50 p-3">
                     <div className="flex flex-wrap items-start justify-between gap-2">
@@ -5460,14 +6579,38 @@ export default function AdminPage() {
                                     <input
                                       type="color"
                                       className={`${fieldClassName} h-10`}
-                                      value={
+                                      value={getColorPickerDraftValue(
+                                        `custom-block.${block.id}.bg.fullscreen-text`,
                                         block.backgroundColor === "transparent"
                                           ? "#ffffff"
-                                          : block.backgroundColor || "#ffffff"
-                                      }
+                                          : block.backgroundColor || "#ffffff",
+                                      )}
                                       disabled={block.backgroundColor === "transparent"}
                                       onChange={(event) =>
-                                        updateCmsHomeCustomBlock(block.id, "backgroundColor", event.target.value)
+                                        stageColorPickerValue(
+                                          `custom-block.${block.id}.bg.fullscreen-text`,
+                                          event.target.value,
+                                        )
+                                      }
+                                      onPointerUp={() =>
+                                        commitColorPickerValue(
+                                          `custom-block.${block.id}.bg.fullscreen-text`,
+                                          block.backgroundColor === "transparent"
+                                            ? "#ffffff"
+                                            : block.backgroundColor || "#ffffff",
+                                          (value) =>
+                                            updateCmsHomeCustomBlock(block.id, "backgroundColor", value),
+                                        )
+                                      }
+                                      onBlur={() =>
+                                        commitColorPickerValue(
+                                          `custom-block.${block.id}.bg.fullscreen-text`,
+                                          block.backgroundColor === "transparent"
+                                            ? "#ffffff"
+                                            : block.backgroundColor || "#ffffff",
+                                          (value) =>
+                                            updateCmsHomeCustomBlock(block.id, "backgroundColor", value),
+                                        )
                                       }
                                     />
                                     <label className="flex items-center gap-2 text-[11px] text-[var(--color-muted)]">
@@ -5575,14 +6718,38 @@ export default function AdminPage() {
                                     <input
                                       type="color"
                                       className={`${fieldClassName} h-10`}
-                                      value={
+                                      value={getColorPickerDraftValue(
+                                        `custom-block.${block.id}.bg.fullscreen-image`,
                                         block.backgroundColor === "transparent"
                                           ? "#ffffff"
-                                          : block.backgroundColor || "#ffffff"
-                                      }
+                                          : block.backgroundColor || "#ffffff",
+                                      )}
                                       disabled={block.backgroundColor === "transparent"}
                                       onChange={(event) =>
-                                        updateCmsHomeCustomBlock(block.id, "backgroundColor", event.target.value)
+                                        stageColorPickerValue(
+                                          `custom-block.${block.id}.bg.fullscreen-image`,
+                                          event.target.value,
+                                        )
+                                      }
+                                      onPointerUp={() =>
+                                        commitColorPickerValue(
+                                          `custom-block.${block.id}.bg.fullscreen-image`,
+                                          block.backgroundColor === "transparent"
+                                            ? "#ffffff"
+                                            : block.backgroundColor || "#ffffff",
+                                          (value) =>
+                                            updateCmsHomeCustomBlock(block.id, "backgroundColor", value),
+                                        )
+                                      }
+                                      onBlur={() =>
+                                        commitColorPickerValue(
+                                          `custom-block.${block.id}.bg.fullscreen-image`,
+                                          block.backgroundColor === "transparent"
+                                            ? "#ffffff"
+                                            : block.backgroundColor || "#ffffff",
+                                          (value) =>
+                                            updateCmsHomeCustomBlock(block.id, "backgroundColor", value),
+                                        )
                                       }
                                     />
                                     <label className="flex items-center gap-2 text-[11px] text-[var(--color-muted)]">
@@ -5668,6 +6835,16 @@ export default function AdminPage() {
                         </div>
 
                         <div>
+                          <label className="text-sm font-medium text-[var(--color-ink)]">Logo URL</label>
+                          <input
+                            className={fieldClassName}
+                            value={appearanceForm.logoUrl}
+                            onChange={(event) => updateAppearanceField("logoUrl", event.target.value)}
+                            placeholder="https://example.com/logo.svg"
+                          />
+                        </div>
+
+                        <div>
                           <label className="text-sm font-medium text-[var(--color-ink)]">Layout Density</label>
                           <select
                             className={fieldClassName}
@@ -5734,24 +6911,51 @@ export default function AdminPage() {
                       <div className="mt-4 space-y-3">
                         {[
                           ["Background", "colorBg"],
+                          ["Main Text", "colorText"],
                           ["Ink", "colorInk"],
                           ["Muted Text", "colorMuted"],
+                          ["Logo", "logoColor"],
                           ["Neutral 100", "colorNeutral100"],
                           ["Neutral 200", "colorNeutral200"],
                           ["Neutral 300", "colorNeutral300"],
                           ["Wood Accent", "colorWood"],
                           ["Wood Dark", "colorWoodDark"],
+                          ["Button", "colorButtonBg"],
+                          ["Button Hover", "colorButtonBgHover"],
+                          ["Button Text", "colorButtonText"],
                         ].map(([label, key]) => (
                           <div key={key}>
                             <label className="text-sm font-medium text-[var(--color-ink)]">{label}</label>
                             <input
                               type="color"
                               className={fieldClassName}
-                              value={appearanceForm[key as keyof AppearanceSettingsState] as string}
+                              value={getColorPickerDraftValue(
+                                `appearance.drawer.${key}`,
+                                appearanceForm[key as keyof AppearanceSettingsState] as string,
+                              )}
                               onChange={(event) =>
-                                updateAppearanceField(
-                                  key as keyof AppearanceSettingsState,
-                                  event.target.value as never,
+                                stageColorPickerValue(`appearance.drawer.${key}`, event.target.value)
+                              }
+                              onPointerUp={() =>
+                                commitColorPickerValue(
+                                  `appearance.drawer.${key}`,
+                                  appearanceForm[key as keyof AppearanceSettingsState] as string,
+                                  (value) =>
+                                    updateAppearanceField(
+                                      key as keyof AppearanceSettingsState,
+                                      value as never,
+                                    ),
+                                )
+                              }
+                              onBlur={() =>
+                                commitColorPickerValue(
+                                  `appearance.drawer.${key}`,
+                                  appearanceForm[key as keyof AppearanceSettingsState] as string,
+                                  (value) =>
+                                    updateAppearanceField(
+                                      key as keyof AppearanceSettingsState,
+                                      value as never,
+                                    ),
                                 )
                               }
                             />
@@ -5843,12 +7047,6 @@ export default function AdminPage() {
                         {appearanceError ? (
                           <p className="rounded-lg bg-red-100 px-4 py-2 text-sm text-red-700">
                             {appearanceError}
-                          </p>
-                        ) : null}
-
-                        {appearanceSuccess ? (
-                          <p className="rounded-lg bg-emerald-100 px-4 py-2 text-sm text-emerald-700">
-                            {appearanceSuccess}
                           </p>
                         ) : null}
 
@@ -6505,13 +7703,40 @@ export default function AdminPage() {
                               type="color"
                               aria-label="Pick swatch color"
                               className="h-11 w-full cursor-pointer rounded-xl border border-black/10 bg-white p-1"
-                              value={toColorInputValue(choice.swatchHex)}
+                              value={getColorPickerDraftValue(
+                                `custom-swatch.${option.formId}.${choice.formId}`,
+                                choice.swatchHex,
+                              )}
                               onChange={(event) =>
-                                updateCustomChoiceField(
-                                  option.formId,
-                                  choice.formId,
-                                  "swatchHex",
+                                stageColorPickerValue(
+                                  `custom-swatch.${option.formId}.${choice.formId}`,
                                   event.target.value,
+                                )
+                              }
+                              onPointerUp={() =>
+                                commitColorPickerValue(
+                                  `custom-swatch.${option.formId}.${choice.formId}`,
+                                  choice.swatchHex,
+                                  (value) =>
+                                    updateCustomChoiceField(
+                                      option.formId,
+                                      choice.formId,
+                                      "swatchHex",
+                                      value,
+                                    ),
+                                )
+                              }
+                              onBlur={() =>
+                                commitColorPickerValue(
+                                  `custom-swatch.${option.formId}.${choice.formId}`,
+                                  choice.swatchHex,
+                                  (value) =>
+                                    updateCustomChoiceField(
+                                      option.formId,
+                                      choice.formId,
+                                      "swatchHex",
+                                      value,
+                                    ),
                                 )
                               }
                             />
@@ -6779,24 +8004,28 @@ export default function AdminPage() {
                 Confirm Action
               </p>
               <h3 className="mt-2 text-xl font-semibold text-[var(--color-ink)]">
-                {confirmDialogAction === "publish" ? "Publish Changes Live?" : "Discard Unsaved Changes?"}
+                {confirmDialogAction === "publish"
+                  ? "Publish Changes Live?"
+                  : confirmDialogAction === "discard"
+                    ? "Discard Unsaved Changes?"
+                    : "Delete Selected Block?"}
               </h3>
               <p className="mt-2 text-sm text-[var(--color-muted)]">
                 {confirmDialogAction === "publish"
                   ? "This will make your current draft visible on the live website immediately."
-                  : "This will remove all unsaved edits and restore the last saved state."}
-              </p>
-              <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
-                {confirmDialogAction === "discard"
-                  ? "This action will discard all changes up untill your last save"
-                  : "This action is important and can affect what visitors see."}
+                  : confirmDialogAction === "discard"
+                    ? "This will remove all unsaved edits and restore the last saved state."
+                    : "This will remove the selected block from the current layout."}
               </p>
 
               <div className="mt-5 flex items-center justify-end gap-2">
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => setConfirmDialogAction(null)}
+                  onClick={() => {
+                    setConfirmDialogAction(null);
+                    setPendingDeleteAction(null);
+                  }}
                 >
                   Cancel
                 </Button>
@@ -6813,10 +8042,20 @@ export default function AdminPage() {
                       return;
                     }
 
+                    if (action === "delete") {
+                      executePendingDeleteAction();
+                      setPendingDeleteAction(null);
+                      return;
+                    }
+
                     void handlePublishCms(true);
                   }}
                 >
-                  {confirmDialogAction === "publish" ? "Yes, Publish Live" : "Yes, Discard Changes"}
+                  {confirmDialogAction === "publish"
+                    ? "Yes, Publish Live"
+                    : confirmDialogAction === "discard"
+                      ? "Yes, Discard Changes"
+                      : "Yes, Delete"}
                 </button>
               </div>
             </div>

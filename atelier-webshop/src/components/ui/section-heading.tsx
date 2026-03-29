@@ -1,6 +1,6 @@
 interface SectionHeadingProps {
   eyebrow?: string;
-  title: string;
+  title?: string;
   description?: string;
   align?: "left" | "center";
   eyebrowEditableId?: string;
@@ -34,17 +34,19 @@ export const SectionHeading = ({
           {eyebrow}
         </p>
       ) : null}
-      <h2
-        {...(titleEditableId
-          ? {
-              "data-cms-editable": titleEditableId,
-              "data-cms-edit-types": "text,color,location",
-            }
-          : {})}
-        className="text-balance text-3xl font-semibold tracking-tight text-[var(--color-ink)] md:text-4xl"
-      >
-        {title}
-      </h2>
+      {title ? (
+        <h2
+          {...(titleEditableId
+            ? {
+                "data-cms-editable": titleEditableId,
+                "data-cms-edit-types": "text,color,location",
+              }
+            : {})}
+          className="text-balance text-3xl font-semibold tracking-tight text-[var(--color-ink)] md:text-4xl"
+        >
+          {title}
+        </h2>
+      ) : null}
       {description ? (
         <p
           {...(descriptionEditableId

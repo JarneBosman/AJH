@@ -2,6 +2,7 @@
 
 :root {
   --color-bg: #fbfaf8;
+  --color-text: #2b231d;
   --color-ink: #2b231d;
   --color-muted: #6f655c;
   --color-neutral-100: #f2ede7;
@@ -9,6 +10,10 @@
   --color-neutral-300: #d7cabc;
   --color-wood: #b88a5b;
   --color-wood-dark: #7f5534;
+  --color-button-bg: #7f5534;
+  --color-button-bg-hover: #b88a5b;
+  --color-button-text: #ffffff;
+  --color-logo: #2b231d;
   --layout-container-max: 80rem;
   --layout-section-gap: 5rem;
 }
@@ -29,6 +34,7 @@
 body {
   margin: 0;
   font-family: var(--font-body);
+  color: var(--color-text);
   background:
     radial-gradient(circle at 15% -10%, #f1e7da 0%, transparent 35%),
     radial-gradient(circle at 90% 0%, #ede7de 0%, transparent 32%),

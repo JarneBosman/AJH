@@ -50,6 +50,7 @@ export default async function RootLayout({
         style={
           {
             "--color-bg": siteSettings.colorBg,
+            "--color-text": siteSettings.colorText,
             "--color-ink": siteSettings.colorInk,
             "--color-muted": siteSettings.colorMuted,
             "--color-neutral-100": siteSettings.colorNeutral100,
@@ -57,6 +58,10 @@ export default async function RootLayout({
             "--color-neutral-300": siteSettings.colorNeutral300,
             "--color-wood": siteSettings.colorWood,
             "--color-wood-dark": siteSettings.colorWoodDark,
+            "--color-button-bg": siteSettings.colorButtonBg,
+            "--color-button-bg-hover": siteSettings.colorButtonBgHover,
+            "--color-button-text": siteSettings.colorButtonText,
+            "--color-logo": siteSettings.logoColor,
             "--font-body":
               siteSettings.fontBody === "jakarta"
                 ? "var(--font-jakarta), sans-serif"
@@ -80,7 +85,11 @@ export default async function RootLayout({
         <I18nProvider initialLanguage={language}>
           <CmsPreviewBridge />
           <div className="flex min-h-screen flex-col bg-[var(--color-bg)]">
-            <SiteHeader brandName={siteSettings.brandName} links={headerLinks} />
+            <SiteHeader
+              brandName={siteSettings.brandName}
+              logoUrl={siteSettings.logoUrl}
+              links={headerLinks}
+            />
             <main className="flex-1">{children}</main>
             <SiteFooter links={footerLinks} />
           </div>

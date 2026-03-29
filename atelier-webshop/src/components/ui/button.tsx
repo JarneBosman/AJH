@@ -9,11 +9,11 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClasses: Record<Variant, string> = {
   primary:
-    "bg-[var(--color-wood-dark)] text-white hover:bg-[var(--color-wood)] focus-visible:ring-[var(--color-wood-dark)]",
+    "bg-[var(--color-button-bg)] text-[var(--color-button-text)] hover:bg-[var(--color-button-bg-hover)] focus-visible:ring-[var(--color-button-bg)]",
   secondary:
-    "bg-[var(--color-neutral-100)] text-[var(--color-ink)] hover:bg-[var(--color-neutral-200)] focus-visible:ring-[var(--color-neutral-300)]",
+    "bg-[var(--color-button-bg)] text-[var(--color-button-text)] hover:bg-[var(--color-button-bg-hover)] focus-visible:ring-[var(--color-button-bg)]",
   ghost:
-    "bg-transparent text-[var(--color-ink)] hover:bg-[var(--color-neutral-100)] focus-visible:ring-[var(--color-neutral-300)]",
+    "bg-transparent text-[var(--color-button-bg)] hover:bg-[var(--color-button-bg)] hover:text-[var(--color-button-text)] focus-visible:ring-[var(--color-button-bg)]",
 };
 
 export const Button = ({

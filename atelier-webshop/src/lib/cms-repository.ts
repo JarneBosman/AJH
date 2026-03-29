@@ -40,6 +40,7 @@ export interface CmsHomeContent {
   storyPointOne?: string;
   storyPointTwo?: string;
   storyPointThree?: string;
+  hiddenEditableIds?: string[];
   customBlocks?: CmsHomeCustomBlock[];
 }
 
@@ -130,6 +131,21 @@ const parseHomeContent = (input: unknown, language: Language): CmsHomeContent | 
 
   if (typeof record.heroImage === "string" && record.heroImage.trim()) {
     output.heroImage = record.heroImage.trim();
+  }
+
+  if (Array.isArray(record.hiddenEditableIds)) {
+    const hiddenEditableIds = Array.from(
+      new Set(
+        record.hiddenEditableIds
+          .filter((entry): entry is string => typeof entry === "string")
+          .map((entry) => entry.trim())
+          .filter(Boolean),
+      ),
+    );
+
+    if (hiddenEditableIds.length > 0) {
+      output.hiddenEditableIds = hiddenEditableIds;
+    }
   }
 
   if (Array.isArray(record.customBlocks)) {
