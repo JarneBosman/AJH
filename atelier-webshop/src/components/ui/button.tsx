@@ -1,7 +1,7 @@
 import { ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/cn";
 
-type Variant = "primary" | "secondary" | "ghost";
+type Variant = "primary" | "secondary" | "ghost" | "destructive";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
@@ -14,6 +14,8 @@ const variantClasses: Record<Variant, string> = {
     "bg-[var(--color-button-bg)] text-[var(--color-button-text)] hover:bg-[var(--color-button-bg-hover)] focus-visible:ring-[var(--color-button-bg)]",
   ghost:
     "bg-transparent text-[var(--color-button-bg)] hover:bg-[var(--color-button-bg)] hover:text-[var(--color-button-text)] focus-visible:ring-[var(--color-button-bg)]",
+  destructive:
+    "bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-600",
 };
 
 export const Button = ({
