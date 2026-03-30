@@ -1083,6 +1083,53 @@ export default function AdminPage() {
   const [isOwner, setIsOwner] = useState<boolean | null>(null);
   const [ownerCheckError, setOwnerCheckError] = useState("");
 
+  const flushPendingPreviewMoveHistory = useCallback((commitToUndoHistory = true) => {
+    const draft = previewMoveHistoryDraftRef.current;
+    if (!draft) {
+      return null;
+    }
+
+    const afterSnapshot: PreviewEditableValues = {
+      ...draft.before,
+      x: draft.latestX,
+      y: draft.latestY,
+      width: draft.latestWidth,
+      height: draft.latestHeight,
+    };
+
+    const hasPositionChange =
+      draft.before.x !== afterSnapshot.x ||
+      draft.before.y !== afterSnapshot.y ||
+      draft.before.width !== afterSnapshot.width ||
+      draft.before.height !== afterSnapshot.height;
+
+    const pendingEntry: PreviewEditHistoryEntry | null = hasPositionChange
+      ? {
+          id: draft.id,
+          before: draft.before,
+          after: afterSnapshot,
+        }
+      : null;
+
+    if (pendingEntry && commitToUndoHistory) {
+      setPreviewUndoHistory((previousHistory) => {
+        const nextHistory = [...previousHistory, pendingEntry];
+        return nextHistory.slice(-previewEditHistoryLimit);
+      });
+      setPreviewRedoHistory([]);
+    }
+
+    previewCommittedValuesRef.current.set(draft.id, afterSnapshot);
+    previewMoveHistoryDraftRef.current = null;
+
+    if (previewMoveHistoryTimerRef.current !== null) {
+      window.clearTimeout(previewMoveHistoryTimerRef.current);
+      previewMoveHistoryTimerRef.current = null;
+    }
+
+    return pendingEntry;
+  }, [previewEditHistoryLimit]);
+
   const getColorPickerDraftValue = useCallback(
     (draftKey: string, committedValue: string) => {
       return toColorInputValue(colorPickerDrafts[draftKey] ?? committedValue);
@@ -2915,12 +2962,17 @@ export default function AdminPage() {
   ]);
 
   const handleUndoPreviewChange = useCallback(() => {
-    if (previewUndoHistory.length === 0) {
+    const pendingMoveEntry = flushPendingPreviewMoveHistory(false);
+
+    if (!pendingMoveEntry && previewUndoHistory.length === 0) {
       return;
     }
 
-    const previousEntry = previewUndoHistory[previewUndoHistory.length - 1];
-    setPreviewUndoHistory((previousHistory) => previousHistory.slice(0, -1));
+    const previousEntry = pendingMoveEntry ?? previewUndoHistory[previewUndoHistory.length - 1];
+
+    if (!pendingMoveEntry) {
+      setPreviewUndoHistory((previousHistory) => previousHistory.slice(0, -1));
+    }
 
     if (previousEntry.hiddenEditableIdsBefore && previousEntry.hiddenEditableIdsAfter) {
       setPreviewRedoHistory((previousHistory) => {
@@ -3016,9 +3068,11 @@ export default function AdminPage() {
         targetId: previousEntry.id,
       },
     );
-  }, [applyPreviewEditableChanges, previewUndoHistory]);
+  }, [applyPreviewEditableChanges, flushPendingPreviewMoveHistory, previewUndoHistory]);
 
   const handleRedoPreviewChange = useCallback(() => {
+    flushPendingPreviewMoveHistory(true);
+
     if (previewRedoHistory.length === 0) {
       return;
     }
@@ -3125,7 +3179,7 @@ export default function AdminPage() {
         targetId: nextEntry.id,
       },
     );
-  }, [applyPreviewEditableChanges, previewRedoHistory]);
+  }, [applyPreviewEditableChanges, flushPendingPreviewMoveHistory, previewRedoHistory]);
 
   const handleQuickEditorImageUpload = useCallback(
     async (file: File) => {
@@ -3562,6 +3616,20 @@ export default function AdminPage() {
             };
           }
         | {
+            type: "cms-preview:position-final";
+            payload: {
+              id: string;
+              beforeX: number;
+              beforeY: number;
+              beforeWidth: number;
+              beforeHeight: number;
+              afterX: number;
+              afterY: number;
+              afterWidth: number;
+              afterHeight: number;
+            };
+          }
+        | {
             type: "cms-preview:editor:delete-selected";
             payload: {
               id: string;
@@ -3577,81 +3645,71 @@ export default function AdminPage() {
         return;
       }
 
-      if (message.type === "cms-preview:position" && message.payload.id === selectedPreviewEditableId) {
+      if (message.type === "cms-preview:position") {
+        if (message.payload.id === selectedPreviewEditableId) {
+          setPreviewEditableValues((previous) => ({
+            ...previous,
+            x: message.payload.x,
+            y: message.payload.y,
+            width: message.payload.width ?? previous.width,
+            height: message.payload.height ?? previous.height,
+          }));
+        }
+        return;
+      }
+
+      if (message.type === "cms-preview:position-final") {
         const committed =
           previewCommittedValuesRef.current.get(message.payload.id) ?? createInitialPreviewEditableValues();
 
+        const beforeSnapshot: PreviewEditableValues = {
+          ...committed,
+          x: message.payload.beforeX,
+          y: message.payload.beforeY,
+          width: message.payload.beforeWidth,
+          height: message.payload.beforeHeight,
+        };
+
+        const afterSnapshot: PreviewEditableValues = {
+          ...beforeSnapshot,
+          x: message.payload.afterX,
+          y: message.payload.afterY,
+          width: message.payload.afterWidth,
+          height: message.payload.afterHeight,
+        };
+
         if (
-          !previewMoveHistoryDraftRef.current ||
-          previewMoveHistoryDraftRef.current.id !== message.payload.id
+          beforeSnapshot.x !== afterSnapshot.x ||
+          beforeSnapshot.y !== afterSnapshot.y ||
+          beforeSnapshot.width !== afterSnapshot.width ||
+          beforeSnapshot.height !== afterSnapshot.height
         ) {
-          previewMoveHistoryDraftRef.current = {
-            id: message.payload.id,
-            before: { ...committed },
-            latestX: message.payload.x,
-            latestY: message.payload.y,
-            latestWidth: message.payload.width ?? committed.width,
-            latestHeight: message.payload.height ?? committed.height,
-          };
-        } else {
-          previewMoveHistoryDraftRef.current.latestX = message.payload.x;
-          previewMoveHistoryDraftRef.current.latestY = message.payload.y;
-          previewMoveHistoryDraftRef.current.latestWidth =
-            message.payload.width ?? previewMoveHistoryDraftRef.current.latestWidth;
-          previewMoveHistoryDraftRef.current.latestHeight =
-            message.payload.height ?? previewMoveHistoryDraftRef.current.latestHeight;
+          setPreviewUndoHistory((previousHistory) => {
+            const nextHistory = [
+              ...previousHistory,
+              {
+                id: message.payload.id,
+                before: beforeSnapshot,
+                after: afterSnapshot,
+              },
+            ];
+            return nextHistory.slice(-previewEditHistoryLimit);
+          });
+          setPreviewRedoHistory([]);
         }
 
-        if (previewMoveHistoryTimerRef.current !== null) {
-          window.clearTimeout(previewMoveHistoryTimerRef.current);
+        previewCommittedValuesRef.current.set(message.payload.id, afterSnapshot);
+
+        if (message.payload.id === selectedPreviewEditableId) {
+          setPreviewEditableValues((previous) => ({
+            ...previous,
+            x: message.payload.afterX,
+            y: message.payload.afterY,
+            width: message.payload.afterWidth,
+            height: message.payload.afterHeight,
+          }));
         }
 
-        previewMoveHistoryTimerRef.current = window.setTimeout(() => {
-          const draft = previewMoveHistoryDraftRef.current;
-          if (!draft) {
-            return;
-          }
-
-          const afterSnapshot: PreviewEditableValues = {
-            ...draft.before,
-            x: draft.latestX,
-            y: draft.latestY,
-            width: draft.latestWidth,
-            height: draft.latestHeight,
-          };
-
-          if (
-            draft.before.x !== afterSnapshot.x ||
-            draft.before.y !== afterSnapshot.y ||
-            draft.before.width !== afterSnapshot.width ||
-            draft.before.height !== afterSnapshot.height
-          ) {
-            setPreviewUndoHistory((previousHistory) => {
-              const nextHistory = [
-                ...previousHistory,
-                {
-                  id: draft.id,
-                  before: draft.before,
-                  after: afterSnapshot,
-                },
-              ];
-              return nextHistory.slice(-previewEditHistoryLimit);
-            });
-            setPreviewRedoHistory([]);
-          }
-
-          previewCommittedValuesRef.current.set(draft.id, afterSnapshot);
-          previewMoveHistoryDraftRef.current = null;
-          previewMoveHistoryTimerRef.current = null;
-        }, 180);
-
-        setPreviewEditableValues((previous) => ({
-          ...previous,
-          x: message.payload.x,
-          y: message.payload.y,
-          width: message.payload.width ?? previous.width,
-          height: message.payload.height ?? previous.height,
-        }));
         return;
       }
 
@@ -3669,7 +3727,7 @@ export default function AdminPage() {
       previewMoveHistoryTimerRef.current = null;
       previewMoveHistoryDraftRef.current = null;
     };
-  }, [handleDeleteSelectedTextTarget, selectedPreviewEditableId]);
+  }, [flushPendingPreviewMoveHistory, handleDeleteSelectedTextTarget, selectedPreviewEditableId]);
 
   useEffect(() => {
     if (!selectedPreviewEditableId) {

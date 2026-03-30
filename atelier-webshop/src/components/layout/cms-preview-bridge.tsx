@@ -433,6 +433,8 @@ export const CmsPreviewBridge = () => {
           startClientY: number;
           startX: number;
           startY: number;
+          startWidth: number;
+          startHeight: number;
         }
       | null = null;
     let resizeState:
@@ -725,6 +727,8 @@ export const CmsPreviewBridge = () => {
         startClientY: event.clientY,
         startX: clampNumeric(Number(selectedElement.dataset.cmsX ?? "0")),
         startY: clampNumeric(Number(selectedElement.dataset.cmsY ?? "0")),
+        startWidth: selectedElement.getBoundingClientRect().width,
+        startHeight: selectedElement.getBoundingClientRect().height,
       };
 
       event.preventDefault();
@@ -864,7 +868,56 @@ export const CmsPreviewBridge = () => {
       if (resizeState) {
         const element = findEditableElementById(resizeState.id);
         if (element) {
+          const finalX = clampNumeric(Number(element.dataset.cmsX ?? "0"));
+          const finalY = clampNumeric(Number(element.dataset.cmsY ?? "0"));
+          const finalRect = element.getBoundingClientRect();
+
+          window.parent.postMessage(
+            {
+              type: "cms-preview:position-final",
+              payload: {
+                id: resizeState.id,
+                beforeX: resizeState.startX,
+                beforeY: resizeState.startY,
+                beforeWidth: Math.round(resizeState.startWidth),
+                beforeHeight: Math.round(resizeState.startHeight),
+                afterX: finalX,
+                afterY: finalY,
+                afterWidth: Math.round(finalRect.width),
+                afterHeight: Math.round(finalRect.height),
+              },
+            },
+            window.location.origin,
+          );
+
           postSelectedToParent(element);
+        }
+      }
+
+      if (dragState) {
+        const element = findEditableElementById(dragState.id);
+        if (element) {
+          const finalX = clampNumeric(Number(element.dataset.cmsX ?? "0"));
+          const finalY = clampNumeric(Number(element.dataset.cmsY ?? "0"));
+          const finalRect = element.getBoundingClientRect();
+
+          window.parent.postMessage(
+            {
+              type: "cms-preview:position-final",
+              payload: {
+                id: dragState.id,
+                beforeX: dragState.startX,
+                beforeY: dragState.startY,
+                beforeWidth: Math.round(dragState.startWidth),
+                beforeHeight: Math.round(dragState.startHeight),
+                afterX: finalX,
+                afterY: finalY,
+                afterWidth: Math.round(finalRect.width),
+                afterHeight: Math.round(finalRect.height),
+              },
+            },
+            window.location.origin,
+          );
         }
       }
 
