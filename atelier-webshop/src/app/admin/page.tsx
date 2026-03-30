@@ -6291,7 +6291,7 @@ export default function AdminPage() {
                           <Button
                             type="button"
                             variant="destructive"
-                            onClick={handleDeleteSelectedTextTarget}
+                            onClick={() => handleDeleteSelectedTextTarget()}
                             className="w-full"
                           >
                             {selectedCustomHomeBlock || selectedCmsBinding?.section === "home"
