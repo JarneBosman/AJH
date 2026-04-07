@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getBrowserSupabaseClient } from "@/lib/supabase/client";
+
+// Ensure singleton client instance
+const supabase = getBrowserSupabaseClient();
 import { Button } from "@/components/ui/button";
 
 export default function LoginPage() {
@@ -20,7 +23,6 @@ export default function LoginPage() {
 
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      const supabase = getBrowserSupabaseClient();
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
         password,
@@ -54,6 +56,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--color-neutral-100)] px-6">
       <div className="w-full max-w-md rounded-3xl border border-black/5 bg-white p-8">
+      // Debug log was accidentally placed here. Removed to fix ReferenceError.
         <h1 className="text-3xl font-semibold text-[var(--color-ink)]">Owner Login</h1>
         <p className="mt-2 text-sm text-[var(--color-muted)]">
           Sign in to manage products and inventory.
@@ -66,9 +69,9 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
-              className="mt-1 w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm text-[var(--color-ink)] transition focus:border-[var(--color-wood)] focus:outline-none focus:ring-1 focus:ring-[var(--color-wood)]/20"
-              placeholder="example@email.com"
+                required
+                className="mt-1 w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm text-[var(--color-ink)] transition focus:border-[var(--color-wood)] focus:outline-none focus:ring-1 focus:ring-[var(--color-wood)]/20"
+                placeholder="example@email.com"
             />
           </div>
 

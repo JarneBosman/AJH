@@ -79,6 +79,13 @@ interface OverlaySelectedMessage {
   };
 }
 
+interface OverlayRouteMessage {
+  type: "cms-preview:route";
+  payload: {
+    path: string;
+  };
+}
+
 type PreviewMessage =
   | {
       type: "cms-preview:update";
@@ -89,10 +96,24 @@ type PreviewMessage =
       payload: {
         blocks: Array<{
           id: string;
-          type: "text" | "image";
+          type: "text" | "image" | "product" | "category";
+          page?: "home" | "shop" | "configurator" | "cart";
           text?: string;
           imageUrl?: string;
           alt?: string;
+          productId?: string;
+          categoryId?: string;
+          productName?: string;
+          productCategory?: string;
+          productSlug?: string;
+          productSubtitle?: string;
+          productLeadTime?: string;
+          productPriceFrom?: string;
+          productImageUrl?: string;
+          categoryName?: string;
+          categorySlug?: string;
+          categoryImageUrl?: string;
+          categoryDescription?: string;
           backgroundColor?: string;
           backgroundShape?: "rounded-square" | "pill";
         }>;
@@ -306,12 +327,26 @@ const collectValues = (element: HTMLElement) => {
 const renderHomeCustomBlocks = (
   blocks: Array<{
     id: string;
-    type: "text" | "image";
+    type: "text" | "image" | "product" | "category";
     text?: string;
     imageUrl?: string;
     alt?: string;
     backgroundColor?: string;
     backgroundShape?: "rounded-square" | "pill";
+    productId?: string;
+    categoryId?: string;
+    productName?: string;
+    productCategory?: string;
+    productSlug?: string;
+    productSubtitle?: string;
+    productLeadTime?: string;
+    productPriceFrom?: string;
+    productImageUrl?: string;
+    categoryName?: string;
+    categorySlug?: string;
+    categoryImageUrl?: string;
+    categoryDescription?: string;
+    page?: "home" | "shop" | "configurator" | "cart";
   }>,
   attempt = 0,
 ) => {
@@ -324,9 +359,20 @@ const renderHomeCustomBlocks = (
     return;
   }
 
+  const pathname = window.location.pathname;
+  const currentPage = pathname.startsWith("/shop")
+    ? "shop"
+    : pathname.startsWith("/configurator")
+      ? "configurator"
+      : pathname.startsWith("/cart")
+        ? "cart"
+        : "home";
+
+  const blocksForPage = blocks.filter((block) => (block.page ?? "home") === currentPage);
+
   container.replaceChildren();
 
-  for (const block of blocks) {
+  for (const block of blocksForPage) {
     const nextRadius = block.backgroundShape === "pill" ? "9999px" : "1.5rem";
     const nextBackground = block.backgroundColor?.trim() || "#ffffff";
 
@@ -379,6 +425,119 @@ const renderHomeCustomBlocks = (
 
       figure.appendChild(wrapper);
       container.appendChild(figure);
+      continue;
+    }
+
+    if (block.type === "product") {
+      const article = document.createElement("article");
+      article.className =
+        "group overflow-hidden rounded-3xl border border-black/5 bg-white shadow-[0_20px_50px_-40px_rgba(0,0,0,0.4)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_60px_-35px_rgba(0,0,0,0.35)]";
+      article.dataset.cmsEditable = `home.customBlock.${block.id}`;
+      article.dataset.cmsEditTypes = "location";
+
+      const link = document.createElement("a");
+      link.href =
+        block.productCategory?.trim() && block.productSlug?.trim()
+          ? `/shop/${block.productCategory}/${block.productSlug}`
+          : "#";
+
+      const media = document.createElement("div");
+      media.className = "relative h-64 overflow-hidden";
+      if (block.productImageUrl?.trim()) {
+        const image = document.createElement("img");
+        image.src = block.productImageUrl;
+        image.alt = block.productName?.trim() || "Product image";
+        image.className = "h-full w-full object-cover transition duration-700 group-hover:scale-105";
+        media.appendChild(image);
+      } else {
+        const placeholder = document.createElement("div");
+        placeholder.className =
+          "flex h-full w-full items-center justify-center text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]";
+        placeholder.textContent = "Product image";
+        media.appendChild(placeholder);
+      }
+
+      const body = document.createElement("div");
+      body.className = "space-y-3 px-4 py-5 sm:px-6 sm:py-6";
+      const meta = document.createElement("p");
+      meta.className = "text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-wood)]";
+      meta.textContent = block.productCategory?.trim() || "Product";
+      const title = document.createElement("h3");
+      title.className = "text-lg font-semibold tracking-tight text-[var(--color-ink)] sm:text-xl";
+      title.textContent = block.productName?.trim() || `Product (${block.productId || "missing"})`;
+      const subtitle = document.createElement("p");
+      subtitle.className = "text-sm leading-6 text-[var(--color-muted)]";
+      subtitle.textContent = block.productSubtitle?.trim() || "";
+      const footer = document.createElement("div");
+      footer.className = "flex items-center justify-between pt-2 text-sm";
+      const price = document.createElement("span");
+      price.className = "font-semibold text-[var(--color-ink)]";
+      price.textContent = block.productPriceFrom ? `From ${block.productPriceFrom}` : "";
+      const lead = document.createElement("span");
+      lead.className = "text-[var(--color-muted)]";
+      lead.textContent = block.productLeadTime?.trim() || "";
+      if (price.textContent) {
+        footer.appendChild(price);
+      }
+      if (lead.textContent) {
+        footer.appendChild(lead);
+      }
+
+      body.appendChild(meta);
+      body.appendChild(title);
+      if (subtitle.textContent) {
+        body.appendChild(subtitle);
+      }
+      if (footer.children.length > 0) {
+        body.appendChild(footer);
+      }
+      link.appendChild(media);
+      link.appendChild(body);
+      article.appendChild(link);
+      container.appendChild(article);
+      continue;
+    }
+
+    if (block.type === "category") {
+      const link = document.createElement("a");
+      link.className = "group overflow-hidden rounded-3xl border border-black/5 bg-white transition hover:-translate-y-1";
+      link.href = block.categorySlug?.trim() ? `/shop/${block.categorySlug}` : "#";
+      link.dataset.cmsEditable = `home.customBlock.${block.id}`;
+      link.dataset.cmsEditTypes = "location";
+
+      const media = document.createElement("div");
+      media.className = "relative h-48 overflow-hidden";
+      if (block.categoryImageUrl?.trim()) {
+        const image = document.createElement("img");
+        image.src = block.categoryImageUrl;
+        image.alt = block.categoryName?.trim() || "Category image";
+        image.className = "h-full w-full object-cover transition duration-500 group-hover:scale-105";
+        media.appendChild(image);
+      } else {
+        const placeholder = document.createElement("div");
+        placeholder.className =
+          "flex h-full w-full items-center justify-center text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]";
+        placeholder.textContent = "Category image";
+        media.appendChild(placeholder);
+      }
+
+      const body = document.createElement("div");
+      body.className = "space-y-2 px-5 py-5";
+      const title = document.createElement("h3");
+      title.className = "text-lg font-semibold text-[var(--color-ink)]";
+      title.textContent = block.categoryName?.trim() || `Category (${block.categoryId || "missing"})`;
+      const description = document.createElement("p");
+      description.className = "text-sm leading-6 text-[var(--color-muted)]";
+      description.textContent = block.categoryDescription?.trim() || "";
+
+      body.appendChild(title);
+      if (description.textContent) {
+        body.appendChild(description);
+      }
+      link.appendChild(media);
+      link.appendChild(body);
+      container.appendChild(link);
+      continue;
     }
   }
 
@@ -389,34 +548,41 @@ const renderHomeCustomBlocks = (
   }
 };
 
-const removeEditableNodesById = (ids: string[], attempt = 0) => {
-  if (ids.length === 0) {
-    return;
-  }
+const syncHiddenEditableNodes = (ids: string[], attempt = 0) => {
+  const hiddenSet = new Set(ids);
 
-  let missing = false;
-
-  for (const id of ids) {
-    const element = findEditableElementById(id);
-    if (!element) {
-      missing = true;
-      continue;
+  const editableNodes = document.querySelectorAll<HTMLElement>("[data-cms-editable]");
+  editableNodes.forEach((element) => {
+    const editableId = element.dataset.cmsEditable;
+    if (!editableId) {
+      return;
     }
 
-    let removeTarget: HTMLElement = element;
-    if (
-      element.tagName === "BUTTON" &&
-      element.parentElement?.tagName === "A" &&
-      element.parentElement.children.length === 1
-    ) {
-      removeTarget = element.parentElement as HTMLElement;
+    if (hiddenSet.has(editableId)) {
+      if (element.dataset.cmsHiddenByEditor !== "true") {
+        element.dataset.cmsHiddenByEditor = "true";
+        element.dataset.cmsHiddenDisplay = element.style.display;
+      }
+      element.style.display = "none";
+      return;
     }
 
-    removeTarget.remove();
-  }
+    if (element.dataset.cmsHiddenByEditor === "true") {
+      const previousDisplay = element.dataset.cmsHiddenDisplay ?? "";
+      if (previousDisplay) {
+        element.style.display = previousDisplay;
+      } else {
+        element.style.removeProperty("display");
+      }
 
+      delete element.dataset.cmsHiddenByEditor;
+      delete element.dataset.cmsHiddenDisplay;
+    }
+  });
+
+  const missing = ids.some((id) => !findEditableElementById(id));
   if (missing && attempt < 6) {
-    window.setTimeout(() => removeEditableNodesById(ids, attempt + 1), 120);
+    window.setTimeout(() => syncHiddenEditableNodes(ids, attempt + 1), 120);
   }
 };
 
@@ -435,6 +601,7 @@ export const CmsPreviewBridge = () => {
           startY: number;
           startWidth: number;
           startHeight: number;
+          previousInlineTransition: string;
         }
       | null = null;
     let resizeState:
@@ -447,8 +614,30 @@ export const CmsPreviewBridge = () => {
           startY: number;
           startWidth: number;
           startHeight: number;
+          previousInlineTransition: string;
         }
       | null = null;
+
+    const beginDraggingElement = (element: HTMLElement) => {
+      const previousInlineTransition = element.style.transition;
+      element.style.transition = "none";
+      element.classList.add("cms-dragging");
+      return previousInlineTransition;
+    };
+
+    const endDraggingElement = (id: string, previousInlineTransition: string) => {
+      const element = findEditableElementById(id);
+      if (!element) {
+        return;
+      }
+
+      element.classList.remove("cms-dragging");
+      if (previousInlineTransition) {
+        element.style.transition = previousInlineTransition;
+      } else {
+        element.style.removeProperty("transition");
+      }
+    };
 
     const updateEditorState = () => {
       document.body.dataset.cmsEditorEnabled = editorEnabled ? "true" : "false";
@@ -559,6 +748,28 @@ export const CmsPreviewBridge = () => {
       }
     };
 
+    const postRouteToParent = () => {
+      const message: OverlayRouteMessage = {
+        type: "cms-preview:route",
+        payload: {
+          path: window.location.pathname || "/",
+        },
+      };
+
+      window.parent.postMessage(message, window.location.origin);
+    };
+
+    let lastKnownPath = window.location.pathname || "/";
+    const routeSyncTimer = window.setInterval(() => {
+      const nextPath = window.location.pathname || "/";
+      if (nextPath !== lastKnownPath) {
+        lastKnownPath = nextPath;
+        postRouteToParent();
+      }
+    }, 250);
+
+    postRouteToParent();
+
     const handler = (event: MessageEvent) => {
       const message = event.data as PreviewMessage;
 
@@ -615,7 +826,12 @@ export const CmsPreviewBridge = () => {
           ? message.payload.ids.filter((entry): entry is string => typeof entry === "string")
           : [];
 
-        removeEditableNodesById(ids);
+        syncHiddenEditableNodes(ids);
+
+        if (selectedId && ids.includes(selectedId)) {
+          selectedId = null;
+          updateEditorState();
+        }
         return;
       }
 
@@ -706,6 +922,7 @@ export const CmsPreviewBridge = () => {
 
       if (resizeEdges.length > 0) {
         const rect = selectedElement.getBoundingClientRect();
+        const previousInlineTransition = beginDraggingElement(selectedElement);
         resizeState = {
           id: selectedId,
           edges: resizeEdges,
@@ -715,12 +932,14 @@ export const CmsPreviewBridge = () => {
           startY: clampNumeric(Number(selectedElement.dataset.cmsY ?? "0")),
           startWidth: rect.width,
           startHeight: rect.height,
+          previousInlineTransition,
         };
 
         event.preventDefault();
         return;
       }
 
+      const previousInlineTransition = beginDraggingElement(selectedElement);
       dragState = {
         id: selectedId,
         startClientX: event.clientX,
@@ -729,6 +948,7 @@ export const CmsPreviewBridge = () => {
         startY: clampNumeric(Number(selectedElement.dataset.cmsY ?? "0")),
         startWidth: selectedElement.getBoundingClientRect().width,
         startHeight: selectedElement.getBoundingClientRect().height,
+        previousInlineTransition,
       };
 
       event.preventDefault();
@@ -892,6 +1112,8 @@ export const CmsPreviewBridge = () => {
 
           postSelectedToParent(element);
         }
+
+        endDraggingElement(resizeState.id, resizeState.previousInlineTransition);
       }
 
       if (dragState) {
@@ -919,6 +1141,8 @@ export const CmsPreviewBridge = () => {
             window.location.origin,
           );
         }
+
+        endDraggingElement(dragState.id, dragState.previousInlineTransition);
       }
 
       dragState = null;
@@ -960,6 +1184,28 @@ export const CmsPreviewBridge = () => {
       }
 
       const key = event.key.toLowerCase();
+
+      const modifierPressed = event.ctrlKey || event.metaKey;
+      if (modifierPressed) {
+        const isUndo = key === "z" && !event.shiftKey;
+        const isRedo = (key === "z" && event.shiftKey) || key === "y";
+
+        if (isUndo || isRedo) {
+          event.preventDefault();
+          event.stopPropagation();
+          window.parent.postMessage(
+            {
+              type: "cms-preview:editor:shortcut",
+              payload: {
+                action: isUndo ? "undo" : "redo",
+              },
+            },
+            window.location.origin,
+          );
+          return;
+        }
+      }
+
       if (key !== "delete" && key !== "backspace") {
         return;
       }
@@ -984,6 +1230,7 @@ export const CmsPreviewBridge = () => {
     document.addEventListener("keydown", handleKeyDown);
 
     return () => {
+      window.clearInterval(routeSyncTimer);
       window.removeEventListener("message", handler);
       document.removeEventListener("click", handleClick, true);
       document.removeEventListener("pointerdown", handlePointerDown);

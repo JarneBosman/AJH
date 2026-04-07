@@ -109,6 +109,15 @@ body[data-cms-editor-enabled="true"] .cms-editable-selected {
   outline-offset: 5px;
 }
 
+body[data-cms-editor-enabled="true"] .cms-dragging * {
+  transition-duration: 0ms !important;
+  transition-delay: 0ms !important;
+}
+
+body[data-cms-editor-enabled="true"] .cms-dragging img {
+  transform: none !important;
+}
+
 h1,
 h2,
 h3,

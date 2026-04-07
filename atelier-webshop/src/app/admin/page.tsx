@@ -132,19 +132,25 @@ interface CmsHomeDraftState {
   customBlocks: CmsHomeContentBlockState[];
 }
 
-type CmsHomeContentBlockType = "text" | "image";
+type CmsHomeContentBlockType = "text" | "image" | "product" | "category";
 type CmsHomeContentBlockShape = "rounded-square" | "pill";
+type CmsCustomBlockPage = "home" | "shop" | "configurator" | "cart";
 
 interface CmsHomeContentBlockState {
   id: string;
   type: CmsHomeContentBlockType;
-  text: string;
-  textNl: string;
-  imageUrl: string;
-  alt: string;
-  altNl: string;
-  backgroundColor: string;
-  backgroundShape: CmsHomeContentBlockShape;
+  page?: CmsCustomBlockPage;
+  // For text/image blocks
+  text?: string;
+  textNl?: string;
+  imageUrl?: string;
+  alt?: string;
+  altNl?: string;
+  backgroundColor?: string;
+  backgroundShape?: CmsHomeContentBlockShape;
+  // For product/category blocks
+  productId?: string;
+  categoryId?: string;
 }
 
 interface CmsLinkRowState {
@@ -264,7 +270,7 @@ interface FullscreenInspectorSize {
 }
 
 interface PendingDeleteAction {
-  mode: "custom-block" | "home-binding" | "clear-text";
+  mode: "custom-block" | "home-binding" | "clear-text" | "hide-editable";
   editableId: string;
   label: string;
   blockId?: string;
@@ -370,17 +376,29 @@ const createInitialCmsHomeDraftState = (): CmsHomeDraftState => ({
 
 const createCmsHomeContentBlock = (
   type: CmsHomeContentBlockType,
-): CmsHomeContentBlockState => ({
-  id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-  type,
-  text: type === "text" ? "New text block" : "",
-  textNl: type === "text" ? "Nieuw tekstblok" : "",
-  imageUrl: "",
-  alt: "",
-  altNl: "",
-  backgroundColor: "#ffffff",
-  backgroundShape: "rounded-square",
-});
+  options?: { productId?: string; categoryId?: string; page?: CmsCustomBlockPage }
+): CmsHomeContentBlockState => {
+  const base = {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    type,
+    page: options?.page ?? "home",
+    backgroundColor: "#ffffff",
+    backgroundShape: "rounded-square" as CmsHomeContentBlockShape,
+  };
+  if (type === "text") {
+    return { ...base, text: "New text block", textNl: "Nieuw tekstblok" };
+  }
+  if (type === "image") {
+    return { ...base, imageUrl: "", alt: "", altNl: "" };
+  }
+  if (type === "product" && options?.productId) {
+    return { ...base, productId: options.productId };
+  }
+  if (type === "category" && options?.categoryId) {
+    return { ...base, categoryId: options.categoryId };
+  }
+  return base;
+};
 
 const createInitialCmsGenericDraftState = (): CmsGenericDraftState => ({
   eyebrow: "",
@@ -511,6 +529,29 @@ const parseCustomHomeBlockEditableId = (id: string): string | null => {
   return match ? match[1] : null;
 };
 
+const resolveCustomBlockPageFromPreviewPath = (path: string): CmsCustomBlockPage => {
+  if (path.startsWith("/shop")) {
+    return "shop";
+  }
+
+  if (path.startsWith("/configurator")) {
+    return "configurator";
+  }
+
+  if (path.startsWith("/cart")) {
+    return "cart";
+  }
+
+  return "home";
+};
+
+const isShopProductCardEditableId = (id: string) => id.startsWith("shop.product-card.");
+
+const isShopCategoryCardEditableId = (id: string) => id.startsWith("shop.category-card.");
+
+const isShopCardEditableId = (id: string) =>
+  isShopProductCardEditableId(id) || isShopCategoryCardEditableId(id);
+
 const parseCmsHomeDraft = (value: unknown): CmsHomeDraftState => {
   const defaults = createInitialCmsHomeDraftState();
 
@@ -537,14 +578,70 @@ const parseCmsHomeDraft = (value: unknown): CmsHomeDraftState => {
       }
 
       const block = entry as Record<string, unknown>;
-      const type = block.type === "image" ? "image" : block.type === "text" ? "text" : null;
+      const type =
+        block.type === "image"
+          ? "image"
+          : block.type === "text"
+            ? "text"
+            : block.type === "product"
+              ? "product"
+              : block.type === "category"
+                ? "category"
+                : null;
       if (!type) {
         return null;
+      }
+
+      if (type === "product") {
+        const productId = asText(block.productId);
+        if (!productId) {
+          return null;
+        }
+
+        return {
+          id: asText(block.id) || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          type,
+          page:
+            block.page === "shop"
+              ? "shop"
+              : block.page === "configurator"
+                ? "configurator"
+                : block.page === "cart"
+                  ? "cart"
+                  : "home",
+          productId,
+          backgroundColor: asText(block.backgroundColor) || "#ffffff",
+          backgroundShape: block.backgroundShape === "pill" ? "pill" : "rounded-square",
+        };
+      }
+
+      if (type === "category") {
+        const categoryId = asText(block.categoryId);
+        if (!categoryId) {
+          return null;
+        }
+
+        return {
+          id: asText(block.id) || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          type,
+          page:
+            block.page === "shop"
+              ? "shop"
+              : block.page === "configurator"
+                ? "configurator"
+                : block.page === "cart"
+                  ? "cart"
+                  : "home",
+          categoryId,
+          backgroundColor: asText(block.backgroundColor) || "#ffffff",
+          backgroundShape: block.backgroundShape === "pill" ? "pill" : "rounded-square",
+        };
       }
 
       return {
         id: asText(block.id) || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
         type,
+        page: block.page === "shop" ? "shop" : "home",
         text: asText(block.text),
         textNl: asText(block.textNl),
         imageUrl: asText(block.imageUrl),
@@ -930,8 +1027,10 @@ const createCmsDraftSnapshot = (
 const areCmsDraftSnapshotsEqual = (left: CmsDraftSnapshot | null, right: CmsDraftSnapshot | null) =>
   JSON.stringify(left) === JSON.stringify(right);
 
+// Ensure singleton client instance
+const supabase = getBrowserSupabaseClient();
+
 export default function AdminPage() {
-  const supabase = useMemo(() => getBrowserSupabaseClient(), []);
   const [session, setSession] = useState<Session | null>(null);
   const [sessionChecked, setSessionChecked] = useState(false);
   const [activeAdminTab, setActiveAdminTab] = useState<"catalog" | "appearance">("catalog");
@@ -957,6 +1056,8 @@ export default function AdminPage() {
   const [previewFullscreenInspectorSize, setPreviewFullscreenInspectorSize] =
     useState<FullscreenInspectorSize>({ width: 420, height: 560 });
   const [homeBlocksMenuOpen, setHomeBlocksMenuOpen] = useState(false);
+  const [selectProductCategoryModalOpen, setSelectProductCategoryModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'products' | 'categories'>('products');
   const [visualEditorEnabled, setVisualEditorEnabled] = useState(false);
   const [previewGridEnabled, setPreviewGridEnabled] = useState(false);
   const [selectedPreviewEditableId, setSelectedPreviewEditableId] = useState("");
@@ -1032,6 +1133,9 @@ export default function AdminPage() {
     | null
   >(null);
   const previewMoveHistoryTimerRef = useRef<number | null>(null);
+  const visualEditorEnabledRef = useRef(visualEditorEnabled);
+  const undoPreviewChangeRef = useRef<() => void>(() => {});
+  const redoPreviewChangeRef = useRef<() => void>(() => {});
   const fullscreenInspectorDragRef = useRef<
     | {
         startClientX: number;
@@ -1251,8 +1355,11 @@ export default function AdminPage() {
   }, []);
 
   const addCmsHomeCustomBlock = useCallback((type: CmsHomeContentBlockType) => {
-    const nextBlock = createCmsHomeContentBlock(type);
-    setPreviewPath("/");
+    const targetPage = resolveCustomBlockPageFromPreviewPath(previewPath);
+    const nextBlock = createCmsHomeContentBlock(type, { page: targetPage });
+    if (targetPage === "home") {
+      setPreviewPath("/");
+    }
     setCmsHomeDraft((previous) => {
       const nextCustomBlocks = [...previous.customBlocks, nextBlock];
 
@@ -1282,10 +1389,64 @@ export default function AdminPage() {
     if (previewFullscreen) {
       positionNewCustomBlockAtViewportCenter(nextBlock.id);
     }
-  }, [positionNewCustomBlockAtViewportCenter, previewFullscreen, selectedPreviewEditableId]);
+  }, [
+    positionNewCustomBlockAtViewportCenter,
+    previewFullscreen,
+    previewPath,
+    selectedPreviewEditableId,
+  ]);
+
+  const addCmsLinkedCustomBlock = useCallback(
+    (type: "product" | "category", linkedId: string) => {
+      const targetPage = resolveCustomBlockPageFromPreviewPath(previewPath);
+      const nextBlock =
+        type === "product"
+          ? createCmsHomeContentBlock("product", { productId: linkedId, page: targetPage })
+          : createCmsHomeContentBlock("category", { categoryId: linkedId, page: targetPage });
+
+      if (targetPage === "home") {
+        setPreviewPath("/");
+      }
+
+      setCmsHomeDraft((previous) => {
+        const nextCustomBlocks = [...previous.customBlocks, nextBlock];
+
+        setPreviewUndoHistory((previousHistory) => {
+          const nextHistory = [
+            ...previousHistory,
+            {
+              id: "home.customBlocks",
+              before: createInitialPreviewEditableValues(),
+              after: createInitialPreviewEditableValues(),
+              customBlocksBefore: previous.customBlocks,
+              customBlocksAfter: nextCustomBlocks,
+              selectedEditableIdBefore: selectedPreviewEditableId,
+              selectedEditableIdAfter: selectedPreviewEditableId,
+            },
+          ];
+          return nextHistory.slice(-previewEditHistoryLimit);
+        });
+        setPreviewRedoHistory([]);
+
+        return {
+          ...previous,
+          customBlocks: nextCustomBlocks,
+        };
+      });
+
+      if (previewFullscreen) {
+        positionNewCustomBlockAtViewportCenter(nextBlock.id);
+      }
+    },
+    [
+      positionNewCustomBlockAtViewportCenter,
+      previewFullscreen,
+      previewPath,
+      selectedPreviewEditableId,
+    ],
+  );
 
   const removeCmsHomeCustomBlock = useCallback((id: string) => {
-    setPreviewPath("/");
     setCmsHomeDraft((previous) => {
       const nextCustomBlocks = previous.customBlocks.filter((block) => block.id !== id);
 
@@ -1315,7 +1476,6 @@ export default function AdminPage() {
 
   const updateCmsHomeCustomBlock = useCallback(
     (id: string, key: keyof Omit<CmsHomeContentBlockState, "id" | "type">, value: string) => {
-      setPreviewPath("/");
       setCmsHomeDraft((previous) => ({
         ...previous,
         customBlocks: previous.customBlocks.map((block) =>
@@ -1613,7 +1773,6 @@ export default function AdminPage() {
   );
 
   const hideCmsHomeEditable = useCallback((editableId: string) => {
-    setPreviewPath("/");
     setCmsHomeDraft((previous) => {
       if (previous.hiddenEditableIds.includes(editableId)) {
         return previous;
@@ -1644,6 +1803,66 @@ export default function AdminPage() {
       };
     });
   }, [selectedPreviewEditableId]);
+
+  const restoreHiddenEditable = useCallback(
+    (editableId: string) => {
+      setCmsHomeDraft((previous) => {
+        if (!previous.hiddenEditableIds.includes(editableId)) {
+          return previous;
+        }
+
+        const nextHiddenEditableIds = previous.hiddenEditableIds.filter((id) => id !== editableId);
+
+        setPreviewUndoHistory((previousHistory) => {
+          const nextHistory = [
+            ...previousHistory,
+            {
+              id: "home.hiddenEditableIds",
+              before: createInitialPreviewEditableValues(),
+              after: createInitialPreviewEditableValues(),
+              hiddenEditableIdsBefore: previous.hiddenEditableIds,
+              hiddenEditableIdsAfter: nextHiddenEditableIds,
+              selectedEditableIdBefore: selectedPreviewEditableId,
+              selectedEditableIdAfter: "",
+            },
+          ];
+          return nextHistory.slice(-previewEditHistoryLimit);
+        });
+        setPreviewRedoHistory([]);
+
+        return {
+          ...previous,
+          hiddenEditableIds: nextHiddenEditableIds,
+        };
+      });
+
+    },
+    [selectedPreviewEditableId],
+  );
+
+  const getEditableDisplayLabel = useCallback(
+    (editableId: string) => {
+      if (isShopProductCardEditableId(editableId)) {
+        const productId = editableId.replace("shop.product-card.", "");
+        const product = products.find((entry) => entry.id === productId);
+        return product ? `Product Card: ${product.name}` : `Product Card (${productId})`;
+      }
+
+      if (isShopCategoryCardEditableId(editableId)) {
+        const slug = editableId.replace("shop.category-card.", "");
+        const category = categoryRows.find((entry) => entry.slug === slug);
+        return category ? `Category Card: ${category.name}` : `Category Card (${slug})`;
+      }
+
+      return editableId;
+    },
+    [categoryRows, products],
+  );
+
+  const hiddenShopCardEditableIds = useMemo(
+    () => cmsHomeDraft.hiddenEditableIds.filter((editableId) => isShopCardEditableId(editableId)),
+    [cmsHomeDraft.hiddenEditableIds],
+  );
 
   useEffect(() => {
     const stored = window.localStorage.getItem(standardOptionStorageKey);
@@ -1865,6 +2084,7 @@ export default function AdminPage() {
         setError(sessionError.message);
       }
 
+      console.log("[ADMIN] getSession result", { data, sessionError });
       setSession(data?.session ?? null);
       setSessionChecked(true);
     };
@@ -1872,6 +2092,7 @@ export default function AdminPage() {
     void initializeSession();
 
     const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      console.log("[ADMIN] onAuthStateChange", nextSession);
       setSession(nextSession ?? null);
     });
 
@@ -1886,6 +2107,7 @@ export default function AdminPage() {
       return;
     }
 
+    console.log("[ADMIN] sessionChecked:", sessionChecked, "session:", session);
     if (!session) {
       router.replace("/admin/login");
     }
@@ -2874,6 +3096,16 @@ export default function AdminPage() {
         return true;
       }
 
+      if (isShopCardEditableId(editableId)) {
+        setPendingDeleteAction({
+          mode: "hide-editable",
+          editableId,
+          label: getEditableDisplayLabel(editableId),
+        });
+        setConfirmDialogAction("delete");
+        return true;
+      }
+
       if (binding?.kind === "text") {
         setPendingDeleteAction({
           mode: "clear-text",
@@ -2887,13 +3119,11 @@ export default function AdminPage() {
       return false;
     },
     [
-      applyPreviewEditableChanges,
       cmsEditableBindingMap,
       cmsHomeDraft.customBlocks,
+      getEditableDisplayLabel,
       hideCmsHomeEditable,
-      removeCmsHomeCustomBlock,
       selectedPreviewEditableId,
-      setCmsBindingValue,
     ],
   );
 
@@ -2909,20 +3139,8 @@ export default function AdminPage() {
       return;
     }
 
-    if (pendingDeleteAction.mode === "home-binding") {
+    if (pendingDeleteAction.mode === "home-binding" || pendingDeleteAction.mode === "hide-editable") {
       hideCmsHomeEditable(pendingDeleteAction.editableId);
-
-      if (previewIframeRef.current?.contentWindow) {
-        previewIframeRef.current.contentWindow.postMessage(
-          {
-            type: "cms-preview:editor:remove",
-            payload: {
-              id: pendingDeleteAction.editableId,
-            },
-          },
-          window.location.origin,
-        );
-      }
 
       setSelectedPreviewEditableId("");
       setSelectedPreviewCapabilities(null);
@@ -2989,7 +3207,6 @@ export default function AdminPage() {
       setSelectedPreviewCapabilities(null);
       setPreviewEditableValues(createInitialPreviewEditableValues());
       previewCommittedValuesRef.current.clear();
-      setPreviewFrameVersion((version) => version + 1);
       return;
     }
 
@@ -3094,7 +3311,6 @@ export default function AdminPage() {
       setSelectedPreviewCapabilities(null);
       setPreviewEditableValues(createInitialPreviewEditableValues());
       previewCommittedValuesRef.current.clear();
-      setPreviewFrameVersion((version) => version + 1);
       return;
     }
 
@@ -3180,6 +3396,15 @@ export default function AdminPage() {
       },
     );
   }, [applyPreviewEditableChanges, flushPendingPreviewMoveHistory, previewRedoHistory]);
+
+  useEffect(() => {
+    visualEditorEnabledRef.current = visualEditorEnabled;
+  }, [visualEditorEnabled]);
+
+  useEffect(() => {
+    undoPreviewChangeRef.current = handleUndoPreviewChange;
+    redoPreviewChangeRef.current = handleRedoPreviewChange;
+  }, [handleRedoPreviewChange, handleUndoPreviewChange]);
 
   const handleQuickEditorImageUpload = useCallback(
     async (file: File) => {
@@ -3404,15 +3629,52 @@ export default function AdminPage() {
       {
         type: "cms-preview:home-custom-blocks",
         payload: {
-          blocks: cmsHomeDraft.customBlocks.map((block) => ({
-            id: block.id,
-            type: block.type,
-            text: block.text,
-            imageUrl: block.imageUrl,
-            alt: block.alt,
-            backgroundColor: block.backgroundColor,
-            backgroundShape: block.backgroundShape,
-          })),
+          blocks: cmsHomeDraft.customBlocks.map((block) => {
+            const product =
+              block.type === "product" && block.productId
+                ? products.find((entry) => entry.id === block.productId)
+                : null;
+            const productImage =
+              product && Array.isArray(product.images)
+                ? product.images.find((entry): entry is string => typeof entry === "string" && Boolean(entry)) ?? ""
+                : "";
+            const category =
+              block.type === "category" && block.categoryId
+                ? categoryRows.find((entry) => entry.id === block.categoryId)
+                : null;
+
+            return {
+              id: block.id,
+              type: block.type,
+              page: block.page,
+              text: block.text,
+              imageUrl: block.imageUrl,
+              alt: block.alt,
+              productId: block.productId,
+              categoryId: block.categoryId,
+              productName: product?.name,
+              productCategory: product?.category,
+              productSlug: product?.slug,
+              productSubtitle: product?.subtitle,
+              productLeadTime: product?.lead_time,
+              productPriceFrom:
+                typeof product?.base_price === "number"
+                  ? new Intl.NumberFormat("nl-NL", {
+                      style: "currency",
+                      currency: "EUR",
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    }).format(product.base_price)
+                  : undefined,
+              productImageUrl: productImage,
+              categoryName: category?.name,
+              categorySlug: category?.slug,
+              categoryImageUrl: category?.hero_image,
+              categoryDescription: category?.description,
+              backgroundColor: block.backgroundColor,
+              backgroundShape: block.backgroundShape,
+            };
+          }),
         },
       },
       window.location.origin,
@@ -3431,6 +3693,8 @@ export default function AdminPage() {
     appearanceForm,
     cmsHomeDraft.customBlocks,
     cmsHomeDraft.hiddenEditableIds,
+    categoryRows,
+    products,
     previewGridEnabled,
     visualEditorEnabled,
   ]);
@@ -3634,6 +3898,18 @@ export default function AdminPage() {
             payload: {
               id: string;
             };
+          }
+        | {
+            type: "cms-preview:editor:shortcut";
+            payload: {
+              action: "undo" | "redo";
+            };
+          }
+        | {
+            type: "cms-preview:route";
+            payload: {
+              path: string;
+            };
           };
 
       if (message.type === "cms-preview:selected") {
@@ -3715,6 +3991,30 @@ export default function AdminPage() {
 
       if (message.type === "cms-preview:editor:delete-selected") {
         handleDeleteSelectedTextTarget(message.payload.id);
+        return;
+      }
+
+      if (message.type === "cms-preview:editor:shortcut") {
+        if (!visualEditorEnabledRef.current) {
+          return;
+        }
+
+        if (message.payload.action === "undo") {
+          undoPreviewChangeRef.current();
+          return;
+        }
+
+        redoPreviewChangeRef.current();
+        return;
+      }
+
+      if (message.type === "cms-preview:route") {
+        const nextPath = typeof message.payload.path === "string" ? message.payload.path : "";
+        if (!nextPath.startsWith("/")) {
+          return;
+        }
+
+        setPreviewPath((current) => (current === nextPath ? current : nextPath));
       }
     };
 
@@ -4553,6 +4853,18 @@ export default function AdminPage() {
     return null;
   }
 
+  const canDeleteSelectedEditable =
+    Boolean(selectedCustomHomeBlock) ||
+    selectedCmsBinding?.section === "home" ||
+    selectedCmsBinding?.kind === "text" ||
+    (selectedPreviewEditableId ? isShopCardEditableId(selectedPreviewEditableId) : false);
+
+  const deleteSelectedEditableLabel = selectedCustomHomeBlock || selectedCmsBinding?.section === "home"
+    ? "Delete Block"
+    : selectedCmsBinding?.kind === "text"
+      ? "Clear Text"
+      : "Remove Card";
+
   return (
     <div className="min-h-screen bg-[var(--color-neutral-100)] p-6">
       <div className="mx-auto max-w-7xl">
@@ -4628,6 +4940,79 @@ export default function AdminPage() {
                 >
                   {previewFullscreen ? "Exit Fullscreen" : "Fullscreen Editor"}
                 </Button>
+                {previewFullscreen && (
+                  <Button
+                    type="button"
+                    variant="primary"
+                    className="inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold tracking-wide transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 [border-radius:var(--button-radius)] bg-[var(--color-button-bg)] text-[var(--color-button-text)] hover:bg-[var(--color-button-bg-hover)] focus-visible:ring-[var(--color-button-bg)]"
+                    onClick={() => setSelectProductCategoryModalOpen(true)}
+                  >
+                    Add Product or Category
+                  </Button>
+                )}
+                    {/* Modal for selecting product or category */}
+                    {selectProductCategoryModalOpen && (
+                      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px]">
+                        <div className="w-full max-w-2xl rounded-2xl border border-black/10 bg-white p-6 shadow-2xl">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex gap-2">
+                              <button
+                                className={`px-4 py-2 rounded-t-lg font-semibold text-sm ${activeTab === 'products' ? 'bg-[var(--color-wood-dark)] text-white' : 'bg-gray-100 text-gray-700'}`}
+                                onClick={() => setActiveTab('products')}
+                              >
+                                Products
+                              </button>
+                              <button
+                                className={`px-4 py-2 rounded-t-lg font-semibold text-sm ${activeTab === 'categories' ? 'bg-[var(--color-wood-dark)] text-white' : 'bg-gray-100 text-gray-700'}`}
+                                onClick={() => setActiveTab('categories')}
+                              >
+                                Categories
+                              </button>
+                            </div>
+                            <Button type="button" variant="secondary" onClick={() => setSelectProductCategoryModalOpen(false)}>
+                              Close
+                            </Button>
+                          </div>
+                          <div className="max-h-[60vh] overflow-y-auto">
+                            {activeTab === 'products' ? (
+                              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {products && products.length > 0 ? (
+                                  products.map((product) => (
+                                    <li key={product.id} className="border rounded-xl p-4 flex flex-col gap-2 hover:bg-gray-50 cursor-pointer" onClick={() => {
+                                      addCmsLinkedCustomBlock("product", product.id);
+                                      setSelectProductCategoryModalOpen(false);
+                                    }}>
+                                      <div className="font-semibold">{product.name}</div>
+                                      <div className="text-xs text-gray-500">{product.category}</div>
+                                      <div className="text-xs text-gray-400">ID: {product.id}</div>
+                                    </li>
+                                  ))
+                                ) : (
+                                  <li>No products found.</li>
+                                )}
+                              </ul>
+                            ) : (
+                              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {categoryRows && categoryRows.length > 0 ? (
+                                  categoryRows.map((category) => (
+                                    <li key={category.id} className="border rounded-xl p-4 flex flex-col gap-2 hover:bg-gray-50 cursor-pointer" onClick={() => {
+                                      addCmsLinkedCustomBlock("category", category.id);
+                                      setSelectProductCategoryModalOpen(false);
+                                    }}>
+                                      <div className="font-semibold">{category.name}</div>
+                                      <div className="text-xs text-gray-500">{category.slug}</div>
+                                      <div className="text-xs text-gray-400">ID: {category.id}</div>
+                                    </li>
+                                  ))
+                                ) : (
+                                  <li>No categories found.</li>
+                                )}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
               </div>
             </div>
 
@@ -5096,7 +5481,7 @@ export default function AdminPage() {
                       </div>
                     ) : null}
 
-                    {selectedCustomHomeBlock || selectedCmsBinding?.section === "home" || selectedCmsBinding?.kind === "text" ? (
+                    {canDeleteSelectedEditable ? (
                       <div className="mt-4 pt-3 border-t border-black/10">
                         <Button
                           type="button"
@@ -5104,10 +5489,28 @@ export default function AdminPage() {
                           onClick={() => handleDeleteSelectedTextTarget()}
                           className="w-full"
                         >
-                          {selectedCustomHomeBlock || selectedCmsBinding?.section === "home"
-                            ? "Delete Block"
-                            : "Clear Text"}
+                          {deleteSelectedEditableLabel}
                         </Button>
+                      </div>
+                    ) : null}
+
+                    {hiddenShopCardEditableIds.length > 0 ? (
+                      <div className="mt-3 rounded-xl border border-black/10 bg-[var(--color-neutral-100)]/55 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
+                          Hidden Product/Category Cards
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {hiddenShopCardEditableIds.map((editableId) => (
+                            <Button
+                              key={`restore-main-${editableId}`}
+                              type="button"
+                              variant="secondary"
+                              onClick={() => restoreHiddenEditable(editableId)}
+                            >
+                              Restore {getEditableDisplayLabel(editableId)}
+                            </Button>
+                          ))}
+                        </div>
                       </div>
                     ) : null}
                   </div>
@@ -5779,6 +6182,14 @@ export default function AdminPage() {
                     <span className="block">Editor</span>
                   </span>
                   <div className="flex flex-wrap items-center justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="primary"
+                      className="inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold tracking-wide transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 [border-radius:var(--button-radius)] bg-[var(--color-button-bg)] text-[var(--color-button-text)] hover:bg-[var(--color-button-bg-hover)] focus-visible:ring-[var(--color-button-bg)]"
+                      onClick={() => setSelectProductCategoryModalOpen(true)}
+                    >
+                      Add Product or Category
+                    </Button>
                     <div className="relative">
                       <Button
                         type="button"
@@ -6344,7 +6755,7 @@ export default function AdminPage() {
                         </div>
                       ) : null}
 
-                      {selectedCustomHomeBlock || selectedCmsBinding?.section === "home" || selectedCmsBinding?.kind === "text" ? (
+                      {canDeleteSelectedEditable ? (
                         <div className="mt-4 pt-3 border-t border-black/10">
                           <Button
                             type="button"
@@ -6352,10 +6763,28 @@ export default function AdminPage() {
                             onClick={() => handleDeleteSelectedTextTarget()}
                             className="w-full"
                           >
-                            {selectedCustomHomeBlock || selectedCmsBinding?.section === "home"
-                              ? "Delete Block"
-                              : "Clear Text"}
+                            {deleteSelectedEditableLabel}
                           </Button>
+                        </div>
+                      ) : null}
+
+                      {hiddenShopCardEditableIds.length > 0 ? (
+                        <div className="mt-3 rounded-xl border border-black/10 bg-[var(--color-neutral-100)]/55 p-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
+                            Hidden Product/Category Cards
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {hiddenShopCardEditableIds.map((editableId) => (
+                              <Button
+                                key={`restore-fullscreen-${editableId}`}
+                                type="button"
+                                variant="secondary"
+                                onClick={() => restoreHiddenEditable(editableId)}
+                              >
+                                Restore {getEditableDisplayLabel(editableId)}
+                              </Button>
+                            ))}
+                          </div>
                         </div>
                       ) : null}
                     </div>

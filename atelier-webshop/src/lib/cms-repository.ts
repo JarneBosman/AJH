@@ -13,10 +13,13 @@ export interface CmsLinkItem {
 
 export interface CmsHomeCustomBlock {
   id: string;
-  type: "text" | "image";
+  type: "text" | "image" | "product" | "category";
+  page?: "home" | "shop" | "configurator" | "cart";
   text?: string;
   imageUrl?: string;
   alt?: string;
+  productId?: string;
+  categoryId?: string;
   backgroundColor?: string;
   backgroundShape?: "rounded-square" | "pill";
 }
@@ -156,11 +159,7 @@ const parseHomeContent = (input: unknown, language: Language): CmsHomeContent | 
         }
 
         const block = entry as Record<string, unknown>;
-        const type = block.type === "image" ? "image" : block.type === "text" ? "text" : null;
-        if (!type) {
-          return null;
-        }
-
+        const type = typeof block.type === "string" ? block.type : null;
         const id =
           typeof block.id === "string" && block.id.trim().length > 0
             ? block.id.trim()
@@ -171,7 +170,6 @@ const parseHomeContent = (input: unknown, language: Language): CmsHomeContent | 
           if (!text) {
             return null;
           }
-
           const backgroundColor =
             typeof block.backgroundColor === "string" && block.backgroundColor.trim()
               ? block.backgroundColor.trim()
@@ -182,41 +180,78 @@ const parseHomeContent = (input: unknown, language: Language): CmsHomeContent | 
               : block.backgroundShape === "rounded-square"
                 ? "rounded-square"
                 : undefined;
-
           return {
             id,
             type,
+            page:
+              block.page === "shop"
+                ? "shop"
+                : block.page === "configurator"
+                  ? "configurator"
+                  : block.page === "cart"
+                    ? "cart"
+                    : "home",
             text,
             ...(backgroundColor ? { backgroundColor } : {}),
             ...(backgroundShape ? { backgroundShape } : {}),
           };
         }
 
-        const imageUrl = typeof block.imageUrl === "string" ? block.imageUrl.trim() : "";
-        if (!imageUrl) {
-          return null;
+        if (type === "image") {
+          const imageUrl = typeof block.imageUrl === "string" ? block.imageUrl.trim() : "";
+          if (!imageUrl) {
+            return null;
+          }
+          const alt = getLocalizedCmsText(block, "alt", language, true);
+          const backgroundColor =
+            typeof block.backgroundColor === "string" && block.backgroundColor.trim()
+              ? block.backgroundColor.trim()
+              : undefined;
+          const backgroundShape =
+            block.backgroundShape === "pill"
+              ? "pill"
+              : block.backgroundShape === "rounded-square"
+                ? "rounded-square"
+                : undefined;
+          return {
+            id,
+            type,
+            page:
+              block.page === "shop"
+                ? "shop"
+                : block.page === "configurator"
+                  ? "configurator"
+                  : block.page === "cart"
+                    ? "cart"
+                    : "home",
+            imageUrl,
+            ...(alt ? { alt } : {}),
+            ...(backgroundColor ? { backgroundColor } : {}),
+            ...(backgroundShape ? { backgroundShape } : {}),
+          };
         }
 
-        const alt = getLocalizedCmsText(block, "alt", language, true);
-        const backgroundColor =
-          typeof block.backgroundColor === "string" && block.backgroundColor.trim()
-            ? block.backgroundColor.trim()
-            : undefined;
-        const backgroundShape =
-          block.backgroundShape === "pill"
-            ? "pill"
-            : block.backgroundShape === "rounded-square"
-              ? "rounded-square"
-              : undefined;
+        if (type === "product") {
+          const productId = typeof block.productId === "string" ? block.productId : undefined;
+          if (!productId) return null;
+          return {
+            id,
+            type,
+            productId,
+          };
+        }
 
-        return {
-          id,
-          type,
-          imageUrl,
-          ...(alt ? { alt } : {}),
-          ...(backgroundColor ? { backgroundColor } : {}),
-          ...(backgroundShape ? { backgroundShape } : {}),
-        };
+        if (type === "category") {
+          const categoryId = typeof block.categoryId === "string" ? block.categoryId : undefined;
+          if (!categoryId) return null;
+          return {
+            id,
+            type,
+            categoryId,
+          };
+        }
+
+        return null;
       })
       .filter((entry): entry is CmsHomeCustomBlock => entry !== null);
 

@@ -8,7 +8,7 @@ import { SectionHeading } from "@/components/ui/section-heading";
 import { Button } from "@/components/ui/button";
 import { getAllCategoriesFromStore } from "@/lib/categories-repository";
 import { localizeCategory, localizeProduct } from "@/lib/content-localization";
-import { getFeaturedProducts } from "@/lib/products-repository";
+import { getFeaturedProducts, getAllProducts } from "@/lib/products-repository";
 import { getTranslations, languageCookieName, normalizeLanguage } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
@@ -40,10 +40,12 @@ export default async function Home() {
   const categories = (await getAllCategoriesFromStore()).map((category) =>
     localizeCategory(category, language),
   );
+  const allProducts = (await getAllProducts()).map((product) => localizeProduct(product, language));
+  const allCategories = (await getAllCategoriesFromStore()).map((category) => localizeCategory(category, language));
   const hiddenEditableIds = new Set(cmsHome?.hiddenEditableIds ?? []);
   const isVisible = (editableId: string) => !hiddenEditableIds.has(editableId);
   const customBlocks = (cmsHome?.customBlocks ?? []).filter((block) =>
-    isVisible(`home.customBlock.${block.id}`),
+    (block.page ?? "home") === "home" && isVisible(`home.customBlock.${block.id}`),
   );
 
   return (
@@ -314,6 +316,87 @@ export default async function Home() {
               </figure>
             ),
           )}
+          {customBlocks.map((block) => {
+            if (block.type === "text") {
+              return (
+                <article
+                  key={block.id}
+                  data-cms-editable={`home.customBlock.${block.id}`}
+                  data-cms-edit-types="text,color,shape,location,background"
+                  className="rounded-3xl border border-black/5 bg-white px-5 py-6 text-[var(--color-muted)] shadow-[0_20px_45px_-35px_rgba(0,0,0,0.45)]"
+                  style={{
+                    backgroundColor: block.backgroundColor || "#ffffff",
+                    borderRadius: block.backgroundShape === "pill" ? "9999px" : "1.5rem",
+                  }}
+                >
+                  <p className="leading-7">{block.text}</p>
+                </article>
+              );
+            }
+            if (block.type === "image") {
+              return (
+                <figure
+                  key={block.id}
+                  data-cms-editable={`home.customBlock.${block.id}`}
+                  data-cms-edit-types="image,shape,location,background"
+                  className="relative overflow-hidden rounded-3xl border border-black/5 bg-white shadow-[0_25px_55px_-35px_rgba(0,0,0,0.5)]"
+                  style={{
+                    backgroundColor: block.backgroundColor || "#ffffff",
+                    borderRadius: block.backgroundShape === "pill" ? "9999px" : "1.5rem",
+                  }}
+                >
+                  <div className="relative aspect-[4/3] w-full">
+                    {block.imageUrl ? (
+                      <Image
+                        src={block.imageUrl}
+                        alt={block.alt || "Homepage custom block image"}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, 50vw"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-[var(--color-neutral-200)] text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
+                        Add image
+                      </div>
+                    )}
+                  </div>
+                </figure>
+              );
+            }
+            if (block.type === "product" && block.productId) {
+              const product = allProducts.find((p) => p.id === block.productId);
+              if (!product) return null;
+              return (
+                <div key={block.id} data-cms-editable={`home.customBlock.${block.id}`} data-cms-edit-types="location" className="rounded-3xl border border-black/5 bg-white">
+                  <ProductCard product={product} />
+                </div>
+              );
+            }
+            if (block.type === "category" && block.categoryId) {
+              const category = allCategories.find((c) => c.id === block.categoryId);
+              if (!category) return null;
+              return (
+                <div key={block.id} data-cms-editable={`home.customBlock.${block.id}`} data-cms-edit-types="location" className="rounded-3xl border border-black/5 bg-white p-5">
+                  <Link href={`/shop/${category.slug}`} className="group block">
+                    <div className="relative h-48 overflow-hidden rounded-2xl">
+                      <Image
+                        src={category.heroImage}
+                        alt={category.name}
+                        fill
+                        className="object-cover transition duration-500 group-hover:scale-105"
+                        sizes="(max-width: 1024px) 50vw, 25vw"
+                      />
+                    </div>
+                    <div className="space-y-2 pt-4">
+                      <h3 className="text-lg font-semibold text-[var(--color-ink)]">{category.name}</h3>
+                      <p className="text-sm leading-6 text-[var(--color-muted)]">{category.description}</p>
+                    </div>
+                  </Link>
+                </div>
+              );
+            }
+            return null;
+          })}
         </div>
       </section>
     </div>
