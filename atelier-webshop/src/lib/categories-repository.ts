@@ -4,6 +4,7 @@ import { getServerSupabaseClient } from "@/lib/supabase/server";
 import { hasSupabaseConfig } from "@/lib/supabase/config";
 
 interface CategoryRow {
+  id: string;
   slug: string;
   name: string;
   name_nl: string | null;
@@ -13,6 +14,7 @@ interface CategoryRow {
 }
 
 const mapRowToCategory = (row: CategoryRow): ProductCategory => ({
+  id: row.id,
   slug: row.slug,
   name: row.name,
   ...(row.name_nl ? { nameNl: row.name_nl } : {}),
@@ -34,7 +36,7 @@ const getSupabaseCategories = async (): Promise<ProductCategory[] | null> => {
 
   const { data, error } = await supabase
     .from("categories")
-    .select("slug, name, name_nl, description, description_nl, hero_image")
+    .select("id, slug, name, name_nl, description, description_nl, hero_image")
     .order("created_at", { ascending: true });
 
   if (error || !data) {

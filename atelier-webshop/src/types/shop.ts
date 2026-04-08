@@ -23,6 +23,7 @@ export interface CustomizationOption {
 }
 
 export interface ProductCategory {
+  id?: string;
   slug: CategorySlug;
   name: string;
   nameNl?: string;
