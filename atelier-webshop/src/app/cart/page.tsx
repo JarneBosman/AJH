@@ -11,7 +11,7 @@ import { getTranslations, languageCookieName, normalizeLanguage } from "@/lib/i1
 import { getAllProducts } from "@/lib/products-repository";
 import { getAllCategoriesFromStore } from "@/lib/categories-repository";
 import { localizeProduct, localizeCategory } from "@/lib/content-localization";
-import ProductCard from "@/components/shop/product-card";
+import { ProductCard } from "@/components/shop/product-card";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
